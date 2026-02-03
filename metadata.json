@@ -1,0 +1,5 @@
+{
+  "name": "BudgetFlow AI",
+  "description": "A smart personal finance organizer that helps you track incomes and expenses for households, manage custom categories, and get AI-powered financial advice.",
+  "requestFramePermissions": []
+}
