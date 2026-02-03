@@ -63,7 +63,7 @@ const createInvestmentPrompt = (investments: Investment[], totalIncome: number):
     3. Pontos positivos e riscos desse tipo de investimento.
 
     No final, dê um parecer geral sobre a diversificação da carteira.
-    Responda em português do Brasil, use formatação Markdown.
+    Responda em português do Brasil, use formatação Markdown, seja direto.
   `;
 };
 
