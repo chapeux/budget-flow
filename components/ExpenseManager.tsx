@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Tag, ShoppingBag, PlusCircle } from 'lucide-react';
 import { Expense, ExpenseType } from '../types';
 import { Button } from './ui/Button';
@@ -26,11 +26,20 @@ export const ExpenseManager: React.FC<ExpenseManagerProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
+  // Initialize with first category or empty, but will update via useEffect
   const [category, setCategory] = useState(categories[0] || '');
   const [type, setType] = useState<ExpenseType>('FIXED');
   
   const [newCategory, setNewCategory] = useState('');
   const [isAddingCategory, setIsAddingCategory] = useState(false);
+
+  // Sync category state when categories prop changes (e.g. data load)
+  useEffect(() => {
+    // If current category is empty OR not present in the available categories list
+    if ((!category || !categories.includes(category)) && categories.length > 0) {
+      setCategory(categories[0]);
+    }
+  }, [categories, category]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
