@@ -13,13 +13,28 @@ import { supabase } from './lib/supabase';
 import { generateBudgetPDF } from './services/pdfGenerator';
 import { Button } from './components/ui/Button';
 
+const DEFAULT_CATEGORIES = [
+  'Alimentação',
+  'Moradia',
+  'Transporte',
+  'Saúde',
+  'Lazer',
+  'Educação',
+  'Compras',
+  'Serviços',
+  'Outros'
+];
+
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [scheduledEvents, setScheduledEvents] = useState<ScheduledEvent[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  
+  // Split categories into custom (fetched) and default
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
   
@@ -72,13 +87,20 @@ export default function App() {
       try {
         setIsLoading(true);
         
-        // 1. Fetch Categories (Filtered by User)
+        // CLEAR STATE immediately
+        setIncomes([]);
+        setExpenses([]);
+        setInvestments([]);
+        setScheduledEvents([]);
+        setCustomCategories([]);
+        
+        // 1. Fetch Custom Categories (Filtered by User)
         const { data: catData } = await supabase
           .from('categories')
           .select('name')
           .eq('user_id', session.user.id);
         
-        if (catData) setCategories(catData.map((c: any) => c.name));
+        if (catData) setCustomCategories(catData.map((c: any) => c.name));
 
         // 2. Fetch Incomes (Filtered by User)
         const { data: incData } = await supabase
@@ -142,6 +164,11 @@ export default function App() {
   }, [session]);
 
   // Derived State
+  // Merge default categories with custom ones, removing duplicates
+  const allCategories = useMemo(() => {
+    return Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories]));
+  }, [customCategories]);
+
   const totalIncome = useMemo(() => incomes.reduce((acc, curr) => acc + curr.amount, 0), [incomes]);
   const totalExpenses = useMemo(() => expenses.reduce((acc, curr) => acc + curr.amount, 0), [expenses]);
   const totalInvestments = useMemo(() => investments.reduce((acc, curr) => acc + curr.amount, 0), [investments]);
@@ -158,11 +185,12 @@ export default function App() {
 
   // Handlers
   const handleLogout = async () => {
-    await supabase.auth.signOut();
     setIncomes([]);
     setExpenses([]);
     setInvestments([]);
     setScheduledEvents([]);
+    setCustomCategories([]);
+    await supabase.auth.signOut();
   };
 
   const addIncome = async (income: Income) => {
@@ -296,13 +324,14 @@ export default function App() {
   };
 
   const addCategory = async (category: string) => {
-    if (categories.includes(category) || !session?.user?.id) return;
+    if (allCategories.includes(category) || !session?.user?.id) return;
     try {
       await supabase.from('categories').insert([{ 
           name: category,
           user_id: session.user.id
       }]);
-      setCategories([...categories, category]);
+      // Update custom categories state
+      setCustomCategories(prev => [...prev, category]);
     } catch (err) {
       console.error('Error adding category:', err);
     }
@@ -447,7 +476,7 @@ export default function App() {
             
             <ExpenseManager 
               expenses={expenses} 
-              categories={categories}
+              categories={allCategories}
               onAdd={addExpense} 
               onRemove={removeExpense}
               onAddCategory={addCategory}
