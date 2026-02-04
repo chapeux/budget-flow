@@ -1,10 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
-import { Income, Expense, Investment } from "../types";
+import { Income, Expense, Investment, Transaction, TransactionType } from "../types";
 
 export type AIProvider = 'groq' | 'gemini';
 
 // --- CONFIGURATION ---
-const getGroqApiKey = () => import.meta.env.VITE_GROQ_API_KEY;
+const getGroqApiKey = () => process.env.GROQ_API_KEY;
 const getGeminiApiKey = () => process.env.API_KEY || process.env.GEMINI_API_KEY;
 
 // --- PROMPT GENERATORS ---
@@ -63,13 +63,57 @@ const createInvestmentPrompt = (investments: Investment[], totalIncome: number):
     3. Pontos positivos e riscos desse tipo de investimento.
 
     No final, dê um parecer geral sobre a diversificação da carteira.
-    Responda em português do Brasil, use formatação Markdown, seja direto.
+    Responda em português do Brasil, use formatação Markdown.
+  `;
+};
+
+const createCategorizationPrompt = (descriptions: string[], categories: string[]): string => {
+  return `
+    Você é um assistente contábil inteligente.
+    Tenho uma lista de descrições de transações bancárias e uma lista de categorias permitidas.
+    
+    Sua tarefa é analisar cada descrição e atribuir a categoria mais apropriada da lista fornecida.
+    Se nenhuma categoria parecer adequada, use "Outros".
+    
+    Categorias Permitidas: ${categories.join(', ')}
+    
+    Transações para classificar:
+    ${JSON.stringify(descriptions)}
+    
+    Retorne APENAS um objeto JSON onde a chave é a descrição original e o valor é a categoria escolhida.
+    Exemplo de saída: { "Uber *Trip": "Transporte", "Mercado Livre": "Compras" }
+  `;
+};
+
+const createStatementParsePrompt = (rawText: string): string => {
+  return `
+    Você é um parser de extratos bancários especializado em converter texto não estruturado (de PDFs) em JSON.
+    
+    Abaixo está o texto cru extraído de um extrato bancário ou fatura de cartão. 
+    Identifique as transações individuais contendo Data, Descrição e Valor.
+    
+    Regras:
+    1. Ignore saldos parciais, cabeçalhos de página ou textos irrelevantes.
+    2. Identifique se a transação é uma Receita (INCOME), Despesa (EXPENSE) ou Transferência (TRANSFER).
+    3. Converta todas as datas para o formato ISO YYYY-MM-DD.
+    4. Converta valores para number (float). Se for despesa, retorne o valor absoluto (positivo), pois o tipo define o sinal.
+    
+    Texto Cru:
+    """
+    ${rawText.slice(0, 30000)} 
+    """
+    
+    Responda APENAS com um array JSON válido no seguinte formato:
+    [
+      { "date": "2024-02-28", "description": "Supermercado X", "amount": 150.50, "transactionType": "EXPENSE" },
+      { "date": "2024-02-05", "description": "Salário Mensal", "amount": 5000.00, "transactionType": "INCOME" }
+    ]
   `;
 };
 
 // --- API HANDLERS ---
 
-const callGroq = async (prompt: string): Promise<string> => {
+const callGroq = async (prompt: string, jsonMode = false): Promise<string> => {
   const apiKey = getGroqApiKey();
   if (!apiKey) throw new Error("Chave da API Groq não encontrada (GROQ_API_KEY).");
 
@@ -81,7 +125,8 @@ const callGroq = async (prompt: string): Promise<string> => {
     },
     body: JSON.stringify({
       messages: [{ role: "user", content: prompt }],
-      model: "llama-3.3-70b-versatile"
+      model: "llama-3.3-70b-versatile",
+      response_format: jsonMode ? { type: "json_object" } : undefined
     })
   });
 
@@ -91,10 +136,10 @@ const callGroq = async (prompt: string): Promise<string> => {
   }
 
   const data = await response.json();
-  return data.choices[0]?.message?.content || "Sem resposta do Groq.";
+  return data.choices[0]?.message?.content || "{}";
 };
 
-const callGemini = async (prompt: string): Promise<string> => {
+const callGemini = async (prompt: string, jsonMode = false): Promise<string> => {
   const apiKey = getGeminiApiKey();
   if (!apiKey) throw new Error("Chave da API Gemini não encontrada (API_KEY).");
 
@@ -106,15 +151,16 @@ const callGemini = async (prompt: string): Promise<string> => {
       contents: prompt,
       config: {
         thinkingConfig: { thinkingBudget: 0 },
+        responseMimeType: jsonMode ? "application/json" : "text/plain"
       }
     });
-    return response.text || "Sem resposta do Gemini.";
+    return response.text || "{}";
   } catch (error: any) {
     throw new Error(`Erro na API Gemini: ${error.message}`);
   }
 };
 
-// --- MAIN EXPORT ---
+// --- MAIN EXPORTS ---
 
 export const analyzeWithAI = async (
   type: 'BUDGET' | 'INVESTMENT',
@@ -142,5 +188,71 @@ export const analyzeWithAI = async (
   } catch (error) {
     console.error("AI Service Error:", error);
     throw error;
+  }
+};
+
+export const suggestCategories = async (
+  descriptions: string[], 
+  categories: string[],
+  provider: AIProvider = 'gemini'
+): Promise<Record<string, string>> => {
+  if (descriptions.length === 0) return {};
+  
+  const uniqueDescriptions = Array.from(new Set(descriptions));
+  const prompt = createCategorizationPrompt(uniqueDescriptions, categories);
+  
+  try {
+    let result = '';
+    if (provider === 'groq') {
+      result = await callGroq(prompt, true);
+    } else {
+      result = await callGemini(prompt, true);
+    }
+    
+    const jsonStart = result.indexOf('{');
+    const jsonEnd = result.lastIndexOf('}');
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      const jsonStr = result.substring(jsonStart, jsonEnd + 1);
+      return JSON.parse(jsonStr);
+    }
+    return JSON.parse(result); 
+  } catch (error) {
+    console.error("AI Categorization Error:", error);
+    return {};
+  }
+};
+
+export const parseBankStatement = async (
+  rawText: string,
+  provider: AIProvider = 'gemini'
+): Promise<Partial<Transaction>[]> => {
+  if (!rawText.trim()) return [];
+
+  const prompt = createStatementParsePrompt(rawText);
+
+  try {
+    let result = '';
+    // Gemini 1.5/3 Flash is excellent at large context extraction
+    if (provider === 'gemini') {
+        result = await callGemini(prompt, true);
+    } else {
+        result = await callGroq(prompt, true);
+    }
+
+    // Attempt to extract JSON array
+    const jsonStart = result.indexOf('[');
+    const jsonEnd = result.lastIndexOf(']');
+    
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+       const jsonStr = result.substring(jsonStart, jsonEnd + 1);
+       return JSON.parse(jsonStr);
+    }
+    
+    // Fallback if full text returned
+    return JSON.parse(result);
+
+  } catch (error) {
+    console.error("AI PDF Parse Error:", error);
+    throw new Error("Falha ao interpretar o PDF com IA. O texto extraído pode estar muito confuso.");
   }
 };

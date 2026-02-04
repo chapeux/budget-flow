@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
+  AreaChart, Area, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { TrendingUp, Calendar, AlertCircle, PiggyBank } from 'lucide-react';
 import { Investment, ScheduledEvent } from '../types';
@@ -230,10 +230,6 @@ export const CashFlowForecast: React.FC<CashFlowForecastProps> = ({ investments,
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#334155' : '#f1f5f9'} />
-            <XAxis 
-                dataKey="name" 
-                hide={true}
-            />
             <YAxis hide />
             <Tooltip 
               formatter={(value: number, name: string) => [

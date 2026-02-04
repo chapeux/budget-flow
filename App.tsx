@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { PlusCircle, Wallet, TrendingDown, PieChart, Loader2, FileDown, Eye, EyeOff, LogOut, Moon, Sun } from 'lucide-react';
+import { PlusCircle, Wallet, TrendingDown, PieChart, Loader2, FileDown, Eye, EyeOff, LogOut, Moon, Sun, LayoutDashboard, ListOrdered } from 'lucide-react';
 import { IncomeManager } from './components/IncomeManager';
 import { ExpenseManager } from './components/ExpenseManager';
 import { InvestmentManager } from './components/InvestmentManager';
@@ -7,8 +7,9 @@ import { ScheduledEventManager } from './components/ScheduledEventManager';
 import { BudgetCharts } from './components/BudgetCharts';
 import { AIAnalysis } from './components/AIAnalysis';
 import { CashFlowForecast } from './components/CashFlowForecast';
+import { TransactionsPage } from './components/TransactionsPage';
 import { Auth } from './components/Auth';
-import { Income, Expense, Investment, ScheduledEvent } from './types';
+import { Income, Expense, Investment, ScheduledEvent, Transaction } from './types';
 import { supabase } from './lib/supabase';
 import { generateBudgetPDF } from './services/pdfGenerator';
 import { Button } from './components/ui/Button';
@@ -28,7 +29,8 @@ const DEFAULT_CATEGORIES = [
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [incomes, setIncomes] = useState<Income[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]); // This is BUDGET
+  const [transactions, setTransactions] = useState<Transaction[]>([]); // This is REALIZED
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [scheduledEvents, setScheduledEvents] = useState<ScheduledEvent[]>([]);
   
@@ -37,6 +39,7 @@ export default function App() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
+  const [currentView, setCurrentView] = useState<'dashboard' | 'transactions'>('dashboard');
   
   // Theme State
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -90,11 +93,12 @@ export default function App() {
         // CLEAR STATE immediately
         setIncomes([]);
         setExpenses([]);
+        setTransactions([]);
         setInvestments([]);
         setScheduledEvents([]);
         setCustomCategories([]);
         
-        // 1. Fetch Custom Categories (Filtered by User)
+        // 1. Fetch Custom Categories
         const { data: catData } = await supabase
           .from('categories')
           .select('name')
@@ -102,7 +106,7 @@ export default function App() {
         
         if (catData) setCustomCategories(catData.map((c: any) => c.name));
 
-        // 2. Fetch Incomes (Filtered by User)
+        // 2. Fetch Incomes
         const { data: incData } = await supabase
           .from('incomes')
           .select('*')
@@ -118,7 +122,7 @@ export default function App() {
             setIncomes(mappedIncomes);
         }
 
-        // 3. Fetch Expenses (Filtered by User)
+        // 3. Fetch Budget Expenses
         const { data: expData } = await supabase
           .from('expenses')
           .select('*')
@@ -126,7 +130,27 @@ export default function App() {
 
         if (expData) setExpenses(expData);
 
-        // 4. Fetch Investments (Filtered by User)
+        // 4. Fetch Real Transactions
+        const { data: transData } = await supabase
+            .from('transactions')
+            .select('*')
+            .eq('user_id', session.user.id);
+        
+        if (transData) {
+            const mappedTransactions = transData.map((t: any) => ({
+                id: t.id,
+                description: t.description,
+                amount: t.amount,
+                category: t.category,
+                type: t.type,
+                transactionType: t.transaction_type || 'EXPENSE', // Default to expense if null/old
+                date: t.date,
+                referenceDate: t.reference_date // Map from snake_case DB to camelCase
+            }));
+            setTransactions(mappedTransactions);
+        }
+
+        // 5. Fetch Investments
         const { data: invData } = await supabase
           .from('investments')
           .select('*')
@@ -143,7 +167,7 @@ export default function App() {
             setInvestments(mappedInvestments);
         }
 
-        // 5. Fetch Scheduled Events (Filtered by User)
+        // 6. Fetch Scheduled Events
         const { data: eventData } = await supabase
           .from('scheduled_events')
           .select('*')
@@ -164,35 +188,34 @@ export default function App() {
   }, [session]);
 
   // Derived State
-  // Merge default categories with custom ones, removing duplicates
   const allCategories = useMemo(() => {
     return Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories]));
   }, [customCategories]);
 
   const totalIncome = useMemo(() => incomes.reduce((acc, curr) => acc + curr.amount, 0), [incomes]);
-  const totalExpenses = useMemo(() => expenses.reduce((acc, curr) => acc + curr.amount, 0), [expenses]);
+  const totalBudgetExpenses = useMemo(() => expenses.reduce((acc, curr) => acc + curr.amount, 0), [expenses]);
   const totalInvestments = useMemo(() => investments.reduce((acc, curr) => acc + curr.amount, 0), [investments]);
   
-  const balance = totalIncome - totalExpenses;
+  const balance = totalIncome - totalBudgetExpenses;
   const freeCash = balance - totalInvestments;
 
-  // Masking Helper
   const displayValue = (value: number) => {
     return isPrivacyMode 
       ? '••••••' 
       : `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
   };
 
-  // Handlers
   const handleLogout = async () => {
     setIncomes([]);
     setExpenses([]);
+    setTransactions([]);
     setInvestments([]);
     setScheduledEvents([]);
     setCustomCategories([]);
     await supabase.auth.signOut();
   };
 
+  // CRUD Handlers
   const addIncome = async (income: Income) => {
     if (!session?.user?.id) return;
     try {
@@ -203,9 +226,7 @@ export default function App() {
             amount: income.amount,
             description: income.description,
             user_id: session.user.id
-        }])
-        .select()
-        .single();
+        }]);
 
       if (error) throw error;
       setIncomes([...incomes, income]);
@@ -234,9 +255,14 @@ export default function App() {
         type: expense.type,
         date: expense.date,
         user_id: session.user.id
-      }]);
+      }])
+      .select()
+      .single();
+
       if (error) throw error;
-      setExpenses([...expenses, expense]);
+      
+      const newExpense = { ...expense, id: (error as any)?.data?.id || expense.id }; 
+      setExpenses(prev => [...prev, newExpense]);
     } catch (err) {
       console.error('Error adding expense:', err);
     }
@@ -251,6 +277,68 @@ export default function App() {
       console.error('Error removing expense:', err);
     }
   };
+
+  // --- TRANSACTIONS HANDLERS ---
+
+  const addTransaction = async (transaction: Transaction) => {
+    if (!session?.user?.id) return;
+    try {
+        // Use referenceDate or fallback to date if not provided
+        const refDate = transaction.referenceDate || transaction.date;
+
+        const { data, error } = await supabase.from('transactions').insert([{
+            description: transaction.description,
+            amount: transaction.amount,
+            category: transaction.category,
+            type: transaction.type,
+            transaction_type: transaction.transactionType, // New column
+            date: transaction.date,
+            reference_date: refDate, 
+            user_id: session.user.id
+        }])
+        .select()
+        .single();
+
+        if (error) throw error;
+        
+        const newTrans = { ...transaction, id: data.id, referenceDate: refDate };
+        setTransactions(prev => [...prev, newTrans]);
+    } catch (err) {
+        console.error('Error adding transaction:', err);
+        // Optimistic update fallback (or error handling)
+        setTransactions(prev => [...prev, transaction]);
+    }
+  };
+
+  const updateTransaction = async (updatedTrans: Transaction) => {
+      try {
+          const { error } = await supabase.from('transactions').update({
+              description: updatedTrans.description,
+              amount: updatedTrans.amount,
+              category: updatedTrans.category,
+              type: updatedTrans.type,
+              transaction_type: updatedTrans.transactionType,
+              date: updatedTrans.date,
+              reference_date: updatedTrans.referenceDate 
+          }).eq('id', updatedTrans.id);
+          
+          if (error) throw error;
+          setTransactions(prev => prev.map(t => t.id === updatedTrans.id ? updatedTrans : t));
+      } catch (err) {
+          console.error('Error updating transaction:', err);
+      }
+  };
+
+  const removeTransaction = async (id: string) => {
+      try {
+          const { error } = await supabase.from('transactions').delete().eq('id', id);
+          if (error) throw error;
+          setTransactions(prev => prev.filter(t => t.id !== id));
+      } catch (err) {
+          console.error('Error removing transaction:', err);
+      }
+  };
+
 
   const addInvestment = async (investment: Investment) => {
     if (!session?.user?.id) return;
@@ -305,11 +393,6 @@ export default function App() {
         }
     } catch (err: any) {
         console.error('Error adding scheduled event:', err);
-        if (err.message?.includes('year')) {
-            alert("Erro ao salvar: Coluna 'year' não existe.");
-        } else {
-            alert("Erro ao salvar evento.");
-        }
     }
   };
 
@@ -330,7 +413,6 @@ export default function App() {
           name: category,
           user_id: session.user.id
       }]);
-      // Update custom categories state
       setCustomCategories(prev => [...prev, category]);
     } catch (err) {
       console.error('Error adding category:', err);
@@ -354,7 +436,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20 transition-colors duration-300">
-      {/* Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 shadow-sm transition-colors duration-300">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -365,6 +446,31 @@ export default function App() {
                 <h1 className="text-xl font-bold text-slate-800 dark:text-white leading-tight">BudgetFlow AI</h1>
                 <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Organize suas finanças</p>
             </div>
+          </div>
+
+          <div className="hidden md:flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+             <button
+               onClick={() => setCurrentView('dashboard')}
+               className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                 currentView === 'dashboard' 
+                   ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-white shadow-sm' 
+                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+               }`}
+             >
+               <LayoutDashboard className="w-4 h-4" />
+               Orçamento (Meta)
+             </button>
+             <button
+               onClick={() => setCurrentView('transactions')}
+               className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                 currentView === 'transactions' 
+                   ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-white shadow-sm' 
+                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+               }`}
+             >
+               <ListOrdered className="w-4 h-4" />
+               Transações (Real)
+             </button>
           </div>
           
           <div className="flex items-center gap-3">
@@ -387,9 +493,9 @@ export default function App() {
             <Button 
               variant="secondary" 
               size="sm"
-              onClick={() => generateBudgetPDF(incomes, expenses)}
+              onClick={() => generateBudgetPDF(incomes, expenses, investments, scheduledEvents)}
               className="flex items-center gap-2 hidden sm:flex dark:bg-slate-800 dark:text-white dark:border-slate-700 dark:hover:bg-slate-700"
-              disabled={incomes.length === 0 && expenses.length === 0}
+              disabled={incomes.length === 0 && expenses.length === 0 && investments.length === 0 && scheduledEvents.length === 0}
             >
               <FileDown className="w-4 h-4" />
               <span>Relatório</span>
@@ -404,123 +510,154 @@ export default function App() {
             </button>
           </div>
         </div>
+        
+        <div className="md:hidden flex border-t border-slate-200 dark:border-slate-800">
+             <button
+               onClick={() => setCurrentView('dashboard')}
+               className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-all ${
+                 currentView === 'dashboard' 
+                   ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/10' 
+                   : 'text-slate-500 dark:text-slate-400'
+               }`}
+             >
+               <LayoutDashboard className="w-4 h-4" />
+               Orçamento
+             </button>
+             <button
+               onClick={() => setCurrentView('transactions')}
+               className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-all ${
+                 currentView === 'transactions' 
+                   ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/10' 
+                   : 'text-slate-500 dark:text-slate-400'
+               }`}
+             >
+               <ListOrdered className="w-4 h-4" />
+               Transações
+             </button>
+        </div>
       </header>
 
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 transition-colors duration-300">
-        
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Renda Total</h3>
-              <PlusCircle className="w-5 h-5 text-emerald-500" />
-            </div>
-            <p className="text-2xl font-bold text-slate-900 dark:text-white">
-              {displayValue(totalIncome)}
-            </p>
-          </div>
-          
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Despesas Totais</h3>
-              <TrendingDown className="w-5 h-5 text-rose-500" />
-            </div>
-            <p className="text-2xl font-bold text-slate-900 dark:text-white">
-              {displayValue(totalExpenses)}
-            </p>
-          </div>
+        {currentView === 'dashboard' ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Renda Planejada</h3>
+                  <PlusCircle className="w-5 h-5 text-emerald-500" />
+                </div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {displayValue(totalIncome)}
+                </p>
+              </div>
+              
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Teto de Gastos (Orçamento)</h3>
+                  <TrendingDown className="w-5 h-5 text-rose-500" />
+                </div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {displayValue(totalBudgetExpenses)}
+                </p>
+              </div>
 
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Investimentos Fixos</h3>
-              <PieChart className="w-5 h-5 text-blue-500" />
-            </div>
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {displayValue(totalInvestments)}
-            </p>
-          </div>
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Investimentos Fixos</h3>
+                  <PieChart className="w-5 h-5 text-blue-500" />
+                </div>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {displayValue(totalInvestments)}
+                </p>
+              </div>
 
-          <div className={`bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors ${freeCash < 0 ? 'border-rose-200 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-900' : ''}`}>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Saldo Livre</h3>
-              <Wallet className="w-5 h-5 text-emerald-500" />
+              <div className={`bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors ${freeCash < 0 ? 'border-rose-200 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-900' : ''}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Saldo Livre (Projetado)</h3>
+                  <Wallet className="w-5 h-5 text-emerald-500" />
+                </div>
+                <p className={`text-2xl font-bold ${freeCash < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                  {displayValue(freeCash)}
+                </p>
+              </div>
             </div>
-            <p className={`text-2xl font-bold ${freeCash < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-              {displayValue(freeCash)}
-            </p>
-          </div>
-        </div>
 
-        {/* AI Analysis Section */}
-        <div className="mb-8">
-          <AIAnalysis 
-            incomes={incomes} 
-            expenses={expenses} 
-            investments={investments}
-            balance={balance}
+            <div className="mb-8">
+              <AIAnalysis 
+                incomes={incomes} 
+                expenses={expenses} 
+                investments={investments}
+                balance={balance}
+                isPrivacyEnabled={isPrivacyMode}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              <div className="lg:col-span-7 space-y-8">
+                <IncomeManager 
+                  incomes={incomes} 
+                  onAdd={addIncome} 
+                  onRemove={removeIncome}
+                  isPrivacyEnabled={isPrivacyMode} 
+                />
+                
+                <ExpenseManager 
+                  expenses={expenses} 
+                  categories={allCategories}
+                  onAdd={addExpense} 
+                  onRemove={removeExpense}
+                  onAddCategory={addCategory}
+                  totalIncome={totalIncome}
+                  totalExpenses={totalBudgetExpenses}
+                  isPrivacyEnabled={isPrivacyMode}
+                />
+
+                <div className="grid grid-cols-1 gap-8">
+                    <InvestmentManager
+                        investments={investments}
+                        scheduledEvents={scheduledEvents}
+                        onAdd={addInvestment}
+                        onAddOneTime={addScheduledEvent}
+                        onRemove={removeInvestment}
+                        onRemoveOneTime={removeScheduledEvent}
+                        isPrivacyEnabled={isPrivacyMode}
+                    />
+                    <ScheduledEventManager
+                        events={scheduledEvents}
+                        onAdd={addScheduledEvent}
+                        onRemove={removeScheduledEvent}
+                        isPrivacyEnabled={isPrivacyMode}
+                    />
+                </div>
+              </div>
+
+              <div className="lg:col-span-5 space-y-8">
+                <CashFlowForecast 
+                  totalIncome={totalIncome}
+                  totalExpenses={totalBudgetExpenses}
+                  investments={investments}
+                  scheduledEvents={scheduledEvents}
+                  isDarkMode={isDarkMode}
+                />
+                <BudgetCharts 
+                  incomes={incomes} 
+                  expenses={expenses}
+                  isPrivacyEnabled={isPrivacyMode}
+                  isDarkMode={isDarkMode}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          <TransactionsPage 
+            transactions={transactions}
+            categories={allCategories}
+            onAdd={addTransaction}
+            onUpdate={updateTransaction}
+            onRemove={removeTransaction}
             isPrivacyEnabled={isPrivacyMode}
           />
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          {/* Left Column: Management */}
-          <div className="lg:col-span-7 space-y-8">
-            <IncomeManager 
-              incomes={incomes} 
-              onAdd={addIncome} 
-              onRemove={removeIncome}
-              isPrivacyEnabled={isPrivacyMode} 
-            />
-            
-            <ExpenseManager 
-              expenses={expenses} 
-              categories={allCategories}
-              onAdd={addExpense} 
-              onRemove={removeExpense}
-              onAddCategory={addCategory}
-              totalIncome={totalIncome}
-              totalExpenses={totalExpenses}
-              isPrivacyEnabled={isPrivacyMode}
-            />
-
-            <div className="grid grid-cols-1 gap-8">
-                <InvestmentManager
-                    investments={investments}
-                    scheduledEvents={scheduledEvents}
-                    onAdd={addInvestment}
-                    onAddOneTime={addScheduledEvent}
-                    onRemove={removeInvestment}
-                    onRemoveOneTime={removeScheduledEvent}
-                    isPrivacyEnabled={isPrivacyMode}
-                />
-                <ScheduledEventManager
-                    events={scheduledEvents}
-                    onAdd={addScheduledEvent}
-                    onRemove={removeScheduledEvent}
-                    isPrivacyEnabled={isPrivacyMode}
-                />
-            </div>
-          </div>
-
-          {/* Right Column: Analytics */}
-          <div className="lg:col-span-5 space-y-8">
-            <CashFlowForecast 
-              totalIncome={totalIncome}
-              totalExpenses={totalExpenses}
-              investments={investments}
-              scheduledEvents={scheduledEvents}
-              isDarkMode={isDarkMode}
-            />
-            <BudgetCharts 
-              incomes={incomes} 
-              expenses={expenses}
-              isPrivacyEnabled={isPrivacyMode}
-              isDarkMode={isDarkMode}
-            />
-          </div>
-        </div>
+        )}
       </main>
     </div>
   );

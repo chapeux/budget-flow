@@ -1,4 +1,5 @@
 export type ExpenseType = 'FIXED' | 'VARIABLE';
+export type TransactionType = 'INCOME' | 'EXPENSE' | 'TRANSFER';
 
 export interface Income {
   id: string;
@@ -7,6 +8,7 @@ export interface Income {
   description?: string;
 }
 
+// Used for Budget/Planning
 export interface Expense {
   id: string;
   name: string;
@@ -14,6 +16,19 @@ export interface Expense {
   category: string;
   type: ExpenseType;
   date: string;
+}
+
+// Used for Real/Daily Transactions
+export interface Transaction {
+  id: string;
+  description: string;
+  amount: number;
+  category: string;
+  transactionType: TransactionType; // New field for Income/Expense/Transfer
+  type?: ExpenseType; // Only relevant if transactionType is EXPENSE
+  date: string; // Data da compra
+  referenceDate?: string; // Mês de competência/Fatura (ISO string)
+  paymentMethod?: string;
 }
 
 export interface Investment {

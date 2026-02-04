@@ -1,11 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Altere de process.env para import.meta.env
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Fallback values to prevent crash during initialization if env vars are missing
+const supabaseUrl = process.env.SUPABASE_URL || 'https://yudnboezoqseovjvtiyf.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1ZG5ib2V6b3FzZW92anZ0aXlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTgwNTIsImV4cCI6MjA4NTY5NDA1Mn0.CO3vywcJtTVs9PKAe1i2navw07Kuih0pLS4UXQ3ABAY';
 
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('Supabase URL or Key is missing. Please check your environment variables.');
+if (supabaseUrl === 'https://yudnboezoqseovjvtiyf.supabase.co') {
+  console.warn('Supabase URL is missing. Please check your environment variables.');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
