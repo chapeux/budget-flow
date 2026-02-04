@@ -111,6 +111,17 @@ const createStatementParsePrompt = (rawText: string): string => {
   `;
 };
 
+// --- HELPER: PROVIDER RESOLUTION ---
+
+const resolveProvider = (requestedProvider: AIProvider): AIProvider => {
+  // If Groq requested but no key, fallback to Gemini
+  if (requestedProvider === 'groq' && !getGroqApiKey()) {
+    console.warn("BudgetFlow AI: Chave da API Groq não encontrada. Alternando automaticamente para Gemini.");
+    return 'gemini';
+  }
+  return requestedProvider;
+};
+
 // --- API HANDLERS ---
 
 const callGroq = async (prompt: string, jsonMode = false): Promise<string> => {
@@ -168,6 +179,7 @@ export const analyzeWithAI = async (
   data: { incomes?: Income[], expenses?: Expense[], investments?: Investment[] }
 ): Promise<string> => {
   
+  const activeProvider = resolveProvider(provider);
   let prompt = '';
   
   if (type === 'BUDGET') {
@@ -180,7 +192,7 @@ export const analyzeWithAI = async (
   }
 
   try {
-    if (provider === 'groq') {
+    if (activeProvider === 'groq') {
       return await callGroq(prompt);
     } else {
       return await callGemini(prompt);
@@ -198,12 +210,13 @@ export const suggestCategories = async (
 ): Promise<Record<string, string>> => {
   if (descriptions.length === 0) return {};
   
+  const activeProvider = resolveProvider(provider);
   const uniqueDescriptions = Array.from(new Set(descriptions));
   const prompt = createCategorizationPrompt(uniqueDescriptions, categories);
   
   try {
     let result = '';
-    if (provider === 'groq') {
+    if (activeProvider === 'groq') {
       result = await callGroq(prompt, true);
     } else {
       result = await callGemini(prompt, true);
@@ -228,12 +241,13 @@ export const parseBankStatement = async (
 ): Promise<Partial<Transaction>[]> => {
   if (!rawText.trim()) return [];
 
+  const activeProvider = resolveProvider(provider);
   const prompt = createStatementParsePrompt(rawText);
 
   try {
     let result = '';
-    // Gemini 1.5/3 Flash is excellent at large context extraction
-    if (provider === 'gemini') {
+    
+    if (activeProvider === 'gemini') {
         result = await callGemini(prompt, true);
     } else {
         result = await callGroq(prompt, true);
@@ -253,6 +267,6 @@ export const parseBankStatement = async (
 
   } catch (error) {
     console.error("AI PDF Parse Error:", error);
-    throw new Error("Falha ao interpretar o PDF com IA. O texto extraído pode estar muito confuso.");
+    throw new Error("Falha ao interpretar o PDF com IA. O texto extraído pode estar muito confuso ou a chave de API é inválida.");
   }
 };

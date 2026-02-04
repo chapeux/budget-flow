@@ -7,8 +7,10 @@ import { suggestCategories, parseBankStatement } from '../services/aiService';
 
 // Fix for pdfjs-dist import in ESM environments
 const pdfjs = (pdfjsLib as any).default || pdfjsLib;
+
+// Use cdnjs for the worker to avoid "importScripts" errors with esm.sh or local path resolution issues
 if (pdfjs.GlobalWorkerOptions) {
-  pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
 interface TransactionsPageProps {
@@ -90,19 +92,25 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
   // ---------------- IMPORT LOGIC ----------------
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    // Use pdfjs.getDocument instead of named import
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-    let fullText = '';
-    
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        // @ts-ignore
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
-        fullText += pageText + '\n';
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        // Use pdfjs.getDocument instead of named import
+        const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        let fullText = '';
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            // @ts-ignore
+            const pageText = textContent.items.map((item: any) => item.str).join(' ');
+            fullText += pageText + '\n';
+        }
+        return fullText;
+    } catch (error) {
+        console.error("PDF Extraction Error:", error);
+        throw new Error("Falha ao extrair texto do PDF. Verifique se o arquivo não está corrompido.");
     }
-    return fullText;
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
