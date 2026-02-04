@@ -113,7 +113,8 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
         setIsParsingPdf(true);
         try {
             const text = await extractTextFromPDF(file);
-            const extractedData = await parseBankStatement(text, 'gemini');
+            // Switch to Groq for PDF Parsing
+            const extractedData = await parseBankStatement(text, 'groq');
             
             const newTransactions: Transaction[] = extractedData.map(item => ({
                 id: crypto.randomUUID(),
@@ -248,7 +249,8 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
     setIsCategorizing(true);
     try {
         const descriptions = parsedTransactions.map(t => t.description);
-        const mapping = await suggestCategories(descriptions, categories, 'gemini');
+        // Switch to Groq for Categorization
+        const mapping = await suggestCategories(descriptions, categories, 'groq');
         
         setParsedTransactions(prev => prev.map(t => ({
             ...t,
