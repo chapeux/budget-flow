@@ -25,6 +25,7 @@ export interface Transaction {
   amount: number;
   category: string;
   transactionType: TransactionType; // New field for Income/Expense/Transfer
+  status: 'DONE' | 'PENDING'; // New field for Realized vs Pending
   type?: ExpenseType; // Only relevant if transactionType is EXPENSE
   date: string; // Data da compra
   referenceDate?: string; // Mês de competência/Fatura (ISO string)

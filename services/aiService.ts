@@ -4,7 +4,7 @@ import { Income, Expense, Investment, Transaction, TransactionType } from "../ty
 export type AIProvider = 'groq' | 'gemini';
 
 // --- CONFIGURATION ---
-const getGroqApiKey = () => import.meta.env.VITE_GROQ_API_KEY;
+const getGroqApiKey = () => process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
 const getGeminiApiKey = () => process.env.API_KEY || process.env.GEMINI_API_KEY;
 
 // --- PROMPT GENERATORS ---

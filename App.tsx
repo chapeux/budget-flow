@@ -143,9 +143,10 @@ export default function App() {
                 amount: t.amount,
                 category: t.category,
                 type: t.type,
-                transactionType: t.transaction_type || 'EXPENSE', // Default to expense if null/old
+                transactionType: t.transaction_type || 'EXPENSE',
+                status: t.status || 'DONE', // Default to DONE for backward compatibility
                 date: t.date,
-                referenceDate: t.reference_date // Map from snake_case DB to camelCase
+                referenceDate: t.reference_date 
             }));
             setTransactions(mappedTransactions);
         }
@@ -283,7 +284,6 @@ export default function App() {
   const addTransaction = async (transaction: Transaction) => {
     if (!session?.user?.id) return;
     try {
-        // Use referenceDate or fallback to date if not provided
         const refDate = transaction.referenceDate || transaction.date;
 
         const { data, error } = await supabase.from('transactions').insert([{
@@ -291,7 +291,8 @@ export default function App() {
             amount: transaction.amount,
             category: transaction.category,
             type: transaction.type,
-            transaction_type: transaction.transactionType, // New column
+            transaction_type: transaction.transactionType,
+            status: transaction.status, // Add Status
             date: transaction.date,
             reference_date: refDate, 
             user_id: session.user.id
@@ -305,7 +306,6 @@ export default function App() {
         setTransactions(prev => [...prev, newTrans]);
     } catch (err) {
         console.error('Error adding transaction:', err);
-        // Optimistic update fallback (or error handling)
         setTransactions(prev => [...prev, transaction]);
     }
   };
@@ -318,6 +318,7 @@ export default function App() {
               category: updatedTrans.category,
               type: updatedTrans.type,
               transaction_type: updatedTrans.transactionType,
+              status: updatedTrans.status, // Add Status
               date: updatedTrans.date,
               reference_date: updatedTrans.referenceDate 
           }).eq('id', updatedTrans.id);
@@ -436,7 +437,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20 transition-colors duration-300">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 shadow-sm transition-colors duration-300">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 shadow-sm transition-colors duration-300">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="bg-emerald-600 p-2 rounded-lg shadow-sm">
