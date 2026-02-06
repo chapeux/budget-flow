@@ -790,9 +790,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
         {/* ROW 1: STATUS, CHART, PENDING */}
         
         {/* COL 1: Vertical Balance */}
-        <div className="md:col-span-3 bg-white dark:bg-slate-900 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col justify-between relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-5"><Wallet className="w-24 h-24" /></div>
-            
+        <div className="md:col-span-3 bg-white dark:bg-slate-900 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col justify-between relative overflow-hidden">          
             <div className="relative z-10 space-y-8">
                 {/* Initial */}
                 <div className="relative pl-6 border-l-2 border-slate-200 dark:border-slate-700">
@@ -918,7 +916,6 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
                         <p className="text-emerald-100 text-xs font-medium mb-1">Receitas</p>
                         <h4 className="text-2xl font-bold">{displayValue(filteredTransactions.filter(t => t.transactionType === 'INCOME').reduce((s, t) => s + t.amount, 0))}</h4>
                     </div>
-                    <button className="bg-white/20 p-1.5 rounded-lg hover:bg-white/30 transition-colors"><PlusCircle className="w-5 h-5 text-white"/></button>
                  </div>
              </div>
 
@@ -930,7 +927,6 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
                         <p className="text-rose-100 text-xs font-medium mb-1">Despesas</p>
                         <h4 className="text-2xl font-bold">{displayValue(filteredTransactions.filter(t => t.transactionType === 'EXPENSE' || t.transactionType === 'TRANSFER').reduce((s, t) => s + t.amount, 0))}</h4>
                     </div>
-                    <button className="bg-white/20 p-1.5 rounded-lg hover:bg-white/30 transition-colors"><div className="w-5 h-0.5 bg-white rounded my-2.5 mx-auto"></div></button>
                  </div>
              </div>
 
