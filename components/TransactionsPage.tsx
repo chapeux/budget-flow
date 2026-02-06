@@ -796,7 +796,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
             <div className="relative z-10 space-y-8">
                 {/* Initial */}
                 <div className="relative pl-6 border-l-2 border-slate-200 dark:border-slate-700">
-                    <div className="absolute -left-[7px] top-0 w-4 h-4 rounded-full bg-slate-400 border-2 border-white dark:border-slate-900 flex items-center justify-center">
+                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-400 border-2 border-white dark:border-slate-900 flex items-center justify-center">
                         <Check className="w-2.5 h-2.5 text-white" />
                     </div>
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Inicial</p>
@@ -805,14 +805,15 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
 
                 {/* Current */}
                 <div className="relative pl-6 border-l-2 border-blue-500">
-                    <div className="absolute -left-[7px] top-0 w-4 h-4 rounded-full bg-blue-500 border-2 border-white dark:border-slate-900 animate-pulse"></div>
+                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white border-2 border-white dark:border-slate-900"></div>
+                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-blue-500 border-2 border-white dark:border-slate-900 animate-pulse"></div>
                     <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1">Saldo acumulado (Efetivado)</p>
                     <p className="text-2xl font-bold text-slate-800 dark:text-white">{displayValue(balanceInfo.current)}</p>
                 </div>
 
                 {/* Forecast */}
                 <div className="relative pl-6 border-l-2 border-slate-200 dark:border-slate-700 border-dashed">
-                    <div className="absolute -left-[7px] top-0 w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-white dark:border-slate-900"></div>
+                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-white dark:border-slate-900"></div>
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Previsto (Com Pendentes)</p>
                     <p className="text-xl font-bold text-slate-500 dark:text-slate-400">{displayValue(balanceInfo.forecast)}</p>
                 </div>
