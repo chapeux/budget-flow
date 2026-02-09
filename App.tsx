@@ -649,6 +649,31 @@ export default function App() {
       }
   };
 
+  const removeShoppingHistoryEntry = async (id: string) => {
+    try {
+        const { error } = await supabase.from('shopping_history').delete().eq('id', id);
+        if (error) throw error;
+        setShoppingHistory(prev => prev.filter(h => h.id !== id));
+    } catch (err) {
+        console.error('Error deleting shopping history:', err);
+    }
+  };
+
+  const updateShoppingHistoryEntry = async (entry: ShoppingHistoryEntry) => {
+    try {
+        const { error } = await supabase.from('shopping_history').update({
+            date: entry.date,
+            total_amount: entry.totalAmount,
+            items: entry.items
+        }).eq('id', entry.id);
+
+        if (error) throw error;
+        setShoppingHistory(prev => prev.map(h => h.id === entry.id ? entry : h));
+    } catch (err) {
+        console.error('Error updating shopping history:', err);
+    }
+  };
+
 
   const addInvestment = async (investment: Investment) => {
     if (!session?.user?.id) return;
@@ -1023,6 +1048,8 @@ export default function App() {
              onClearAll={clearShoppingList}
              onFinalize={finalizeShoppingList}
              history={priceHistory}
+             onRemoveHistory={removeShoppingHistoryEntry}
+             onUpdateHistory={updateShoppingHistoryEntry}
           />
         ) : (
           <TransactionsPage 
