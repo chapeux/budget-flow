@@ -43,13 +43,17 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [activeTab, setActiveTab] = useState<'LIST' | 'HISTORY'>('LIST');
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
+  // New Item State
   const [newName, setNewName] = useState('');
   const [newQuantity, setNewQuantity] = useState('1');
   const [newCategory, setNewCategory] = useState('');
   const [newPrice, setNewPrice] = useState('');
   
   const [isCategorizing, setIsCategorizing] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // Expanded/Edit Mode State for Items
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<ShoppingItem | null>(null);
 
   // History Edit State
   const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
@@ -60,48 +64,41 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     if (!newName) return;
 
     const payload = {
+      id: generateUUID(),
       name: newName,
       quantity: parseFloat(newQuantity) || 1,
       category: newCategory || undefined,
-      price: newPrice ? parseFloat(newPrice) : undefined
+      price: newPrice ? parseFloat(newPrice) : undefined,
+      isChecked: false
     };
 
-    if (editingId) {
-      // Update existing item
-      const existingItem = items.find(i => i.id === editingId);
-      if (existingItem) {
-        onUpdate({
-          ...existingItem,
-          ...payload
-        });
-      }
-      resetForm();
-    } else {
-      // Add new item
-      onAdd({
-        id: generateUUID(),
-        ...payload,
-        isChecked: false,
-      });
-      resetForm();
-    }
-  };
-
-  const handleEdit = (item: ShoppingItem) => {
-    setEditingId(item.id);
-    setNewName(item.name);
-    setNewQuantity(item.quantity.toString());
-    setNewCategory(item.category || '');
-    setNewPrice(item.price?.toString() || '');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const resetForm = () => {
+    onAdd(payload);
+    
+    // Reset form
     setNewName('');
     setNewQuantity('1');
     setNewCategory('');
     setNewPrice('');
-    setEditingId(null);
+  };
+
+  const handleExpandItem = (item: ShoppingItem) => {
+    if (expandedItemId === item.id) {
+      // Close
+      setExpandedItemId(null);
+      setEditValues(null);
+    } else {
+      // Open
+      setExpandedItemId(item.id);
+      setEditValues({ ...item });
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (editValues) {
+      onUpdate(editValues);
+      setExpandedItemId(null);
+      setEditValues(null);
+    }
   };
 
   const handleToggle = (item: ShoppingItem) => {
@@ -129,7 +126,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     setIsCategorizing(true);
     try {
       const names = itemsToProcess.map(i => i.name);
-      // Ensure 'groq' is used as requested
       const suggestions = await suggestShoppingCategories(names, 'groq');
       
       itemsToProcess.forEach(item => {
@@ -148,11 +144,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     } finally {
       setIsCategorizing(false);
     }
-  };
-
-  const updateItemPrice = (item: ShoppingItem, priceStr: string) => {
-    const price = parseFloat(priceStr);
-    onUpdate({ ...item, price: isNaN(price) ? undefined : price });
   };
 
   const normalizeCategory = (fullCategory: string) => {
@@ -195,38 +186,35 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       const pct = (diff / lastPrice) * 100;
       const lastPriceFormatted = lastPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       
-      if (Math.abs(diff) < 0.01) return <span className="text-xs text-slate-400">=</span>;
+      if (Math.abs(diff) < 0.01) return <div className="text-xs text-slate-400 font-medium mt-0.5 text-right">=</div>;
 
       if (diff > 0) {
           return (
-              <div className="flex items-center gap-1 text-[10px] text-rose-500 font-medium bg-rose-50 dark:bg-rose-900/20 px-1.5 py-0.5 rounded" title={`Preço anterior: R$ ${lastPriceFormatted}`}>
-                  <TrendingUp className="w-3 h-3" />
-                  <span>+{pct.toFixed(0)}% (R$ {lastPriceFormatted})</span>
+              <div className="text-xs font-bold text-rose-500 mt-0.5 text-right whitespace-nowrap" title={`Preço anterior: R$ ${lastPriceFormatted}`}>
+                  +{pct.toFixed(0)}% (R$ {lastPriceFormatted})
               </div>
           );
       } else {
           return (
-             <div className="flex items-center gap-1 text-[10px] text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded" title={`Preço anterior: R$ ${lastPriceFormatted}`}>
-                 <TrendingDown className="w-3 h-3" />
-                 <span>{pct.toFixed(0)}% (R$ {lastPriceFormatted})</span>
+             <div className="text-xs font-bold text-emerald-500 mt-0.5 text-right whitespace-nowrap" title={`Preço anterior: R$ ${lastPriceFormatted}`}>
+                 {pct.toFixed(0)}% (R$ {lastPriceFormatted})
              </div>
           );
       }
   };
 
   const toggleHistoryExpand = (id: string) => {
-      // Don't toggle if we are editing this one (clicks inside input might propagate)
+      // Prevent toggling if we are currently editing this item
       if (editingHistoryId === id) return;
       setExpandedHistoryId(expandedHistoryId === id ? null : id);
   };
 
   // --- History Edit Handlers ---
-
   const handleHistoryEditClick = (e: React.MouseEvent, entry: ShoppingHistoryEntry) => {
       e.stopPropagation();
       setEditingHistoryId(entry.id);
-      setTempHistoryEntry(JSON.parse(JSON.stringify(entry))); // Deep copy
-      setExpandedHistoryId(entry.id); // Ensure expanded
+      setTempHistoryEntry(JSON.parse(JSON.stringify(entry)));
+      setExpandedHistoryId(entry.id);
   };
 
   const handleHistoryDeleteClick = (e: React.MouseEvent, id: string) => {
@@ -239,7 +227,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const handleHistorySave = (e: React.MouseEvent) => {
       e.stopPropagation();
       if (tempHistoryEntry && onUpdateHistory) {
-          // Recalculate total just in case
           const newTotal = tempHistoryEntry.items.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
           onUpdateHistory({ ...tempHistoryEntry, totalAmount: newTotal });
       }
@@ -257,10 +244,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       if (!tempHistoryEntry) return;
       const newItems = [...tempHistoryEntry.items];
       newItems[idx] = { ...newItems[idx], [field]: value };
-      
-      // Auto recalc total for local state
       const newTotal = newItems.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
-      
       setTempHistoryEntry({ ...tempHistoryEntry, items: newItems, totalAmount: newTotal });
   };
 
@@ -272,7 +256,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
       
       {/* TABS */}
       <div className="flex space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
@@ -292,18 +276,18 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {activeTab === 'LIST' ? (
       <>
+        {/* ADD ITEM FORM */}
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
                     <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                        {editingId ? 'Editar Item' : 'Itens da Lista'}
+                        Adicionar Item
                     </h2>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
                         Gerencie e categorize suas compras.
                     </p>
                 </div>
                 
-                {!editingId && (
                 <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                     {items.length > 0 && (
                     <Button 
@@ -324,14 +308,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         className="w-full sm:w-auto"
                     >
                         {isCategorizing ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Sparkles className="w-4 h-4 mr-2 text-purple-600"/>}
-                        {isCategorizing ? 'Processando...' : 'Organizar com IA (Groq)'}
+                        {isCategorizing ? 'IA: Organizar' : 'IA: Organizar'}
                     </Button>
                 </div>
-                )}
             </div>
 
-            {/* INPUT FORM */}
-            <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-2 mb-8 items-start md:items-stretch">
+            <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-2 mb-2 items-start md:items-stretch">
                 <div className="flex-1 w-full">
                     <input 
                         type="text" 
@@ -341,7 +323,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-orange-500 outline-none text-slate-900 dark:text-white"
                     />
                 </div>
-                {/* CATEGORY INPUT: Hidden on Mobile as requested */}
+                {/* CATEGORY INPUT: Hidden on Mobile */}
                 <div className="hidden md:block w-full md:w-40">
                     <input 
                         type="text" 
@@ -373,106 +355,146 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-orange-500 outline-none text-slate-900 dark:text-white text-center"
                     />
                 </div>
-                <div className="flex w-full md:w-auto gap-2">
-                {editingId && (
-                    <Button type="button" onClick={resetForm} variant="secondary" className="flex-1 md:flex-none">
-                    <X className="w-5 h-5" />
-                    </Button>
-                )}
-                <Button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white flex-1 md:flex-none">
-                    {editingId ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                <Button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white w-full md:w-auto">
+                    <Plus className="w-5 h-5" />
                 </Button>
-                </div>
             </form>
+        </div>
 
-            <div className="space-y-6">
-                {items.length === 0 && (
-                    <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
-                        Sua lista de compras está vazia.
-                    </div>
-                )}
+        {/* SHOPPING LIST ITEMS */}
+        <div className="space-y-6">
+            {items.length === 0 && (
+                <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-800/30">
+                    Sua lista de compras está vazia.
+                </div>
+            )}
 
-                {groupedItems.map(group => (
-                    <div key={group.name} className="space-y-2">
-                        <h3 className="font-semibold text-slate-600 dark:text-slate-300 text-sm uppercase tracking-wider pl-1 flex items-center gap-2">
-                            {group.icon && <span className="text-base">{group.icon}</span>}
-                            {group.name}
-                            <span className="text-xs font-normal text-slate-400 normal-case bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                                {group.items.length}
-                            </span>
-                        </h3>
-                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                            {group.items.map(item => (
+            {groupedItems.map(group => (
+                <div key={group.name} className="space-y-3">
+                    <h3 className="font-semibold text-slate-600 dark:text-slate-300 text-sm uppercase tracking-wider pl-1 flex items-center gap-2">
+                        {group.icon && <span className="text-base">{group.icon}</span>}
+                        {group.name}
+                        <span className="text-xs font-normal text-slate-400 normal-case bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                            {group.items.length}
+                        </span>
+                    </h3>
+                    
+                    <div className="grid gap-3">
+                        {group.items.map(item => {
+                            const isExpanded = expandedItemId === item.id;
+                            
+                            return (
                                 <div 
-                                    key={item.id} 
-                                    className={`border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-white dark:hover:bg-slate-800 transition-colors ${item.isChecked ? 'opacity-50 bg-slate-50 dark:bg-slate-900' : ''} ${editingId === item.id ? 'ring-2 ring-orange-500 ring-inset bg-orange-50 dark:bg-orange-900/10' : ''}`}
+                                  key={item.id} 
+                                  className={`bg-white dark:bg-slate-900 rounded-2xl shadow-sm border transition-all duration-200 overflow-hidden ${isExpanded ? 'border-orange-500 ring-1 ring-orange-500 shadow-md' : 'border-slate-200 dark:border-slate-800'}`}
                                 >
-                                    <div className="flex items-start gap-3 p-3">
-                                        {/* 1. Left: Checkbox */}
+                                    {/* Main Card View */}
+                                    <div 
+                                      className={`p-4 flex items-center gap-4 cursor-pointer relative ${item.isChecked ? 'opacity-60 bg-slate-50 dark:bg-slate-900' : ''}`}
+                                      onClick={() => handleExpandItem(item)}
+                                    >
+                                        {/* Large Circular Checkbox */}
                                         <button 
-                                            onClick={() => handleToggle(item)}
-                                            className={`mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                                            onClick={(e) => { e.stopPropagation(); handleToggle(item); }}
+                                            className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
                                                 item.isChecked 
-                                                ? 'bg-emerald-500 border-emerald-500 text-white' 
-                                                : 'border-slate-300 dark:border-slate-600 hover:border-emerald-500'
+                                                ? 'bg-slate-900 border-slate-900 dark:bg-slate-100 dark:border-slate-100 text-white dark:text-slate-900' 
+                                                : 'border-slate-300 dark:border-slate-600 hover:border-orange-500 dark:hover:border-orange-400 bg-white dark:bg-slate-800'
                                             }`}
                                         >
-                                            {item.isChecked && <Check className="w-3.5 h-3.5" />}
+                                            {item.isChecked && <Check strokeWidth={3} className="w-4 h-4" />}
                                         </button>
                                         
-                                        {/* 2. Middle: Name and Meta Info */}
-                                        <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                            <span className={`font-medium text-slate-800 dark:text-white block truncate ${item.isChecked ? 'line-through text-slate-500 dark:text-slate-500' : ''}`}>
-                                                {item.name}
-                                            </span>
-                                            
-                                            <div className="flex flex-wrap items-center gap-2 mt-1">
-                                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded shadow-sm border border-slate-100 dark:border-slate-700">
+                                        {/* Content */}
+                                        <div className="flex-1 flex justify-between items-start min-w-0">
+                                            <div className="flex flex-col pr-2 min-w-0">
+                                                <span className={`text-lg font-medium leading-snug truncate ${item.isChecked ? 'line-through text-slate-500' : 'text-slate-900 dark:text-white'}`}>
+                                                    {item.name}
+                                                </span>
+                                                <span className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">
                                                     {item.quantity} un
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="flex flex-col items-end flex-shrink-0">
+                                                <span className={`text-xl font-semibold tracking-tight ${item.isChecked ? 'text-slate-500' : 'text-slate-900 dark:text-white'}`}>
+                                                    R$ {item.price ? item.price.toLocaleString('pt-BR', {minimumFractionDigits: 2}) : '0,00'}
                                                 </span>
                                                 {item.price && !item.isChecked && getPriceComparison(item.name, item.price)}
                                             </div>
                                         </div>
-                                        
-                                        {/* 3. Right: Price Input and Actions Stacked */}
-                                        <div className="flex flex-col items-end gap-2 pl-2">
-                                            <div className="flex items-center gap-1 justify-end">
-                                                <span className="text-slate-400 text-xs">R$</span>
-                                                <input 
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={item.price || ''}
-                                                    placeholder="0.00"
-                                                    onChange={(e) => updateItemPrice(item, e.target.value)}
-                                                    className="w-20 p-1 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-right focus:border-orange-500 focus:outline-none"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                            </div>
 
-                                            <div className="flex items-center gap-1 justify-end">
-                                                <button 
-                                                    onClick={() => handleEdit(item)}
-                                                    className="text-slate-400 hover:text-blue-500 transition-colors p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                                    title="Editar item"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button 
-                                                    onClick={() => onRemove(item.id)}
-                                                    className="text-slate-400 hover:text-rose-500 transition-colors p-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20"
-                                                    title="Remover item"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
+                                        {/* Expand Chevron Hint */}
+                                        <div className="absolute right-2 top-2 opacity-0">
+                                            <ChevronDown className="w-4 h-4 text-slate-300" />
                                         </div>
                                     </div>
+
+                                    {/* Expanded Edit Form */}
+                                    {isExpanded && editValues && (
+                                        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="col-span-2">
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 block">Nome / Descrição</label>
+                                                    <input 
+                                                        type="text"
+                                                        value={editValues.name}
+                                                        onChange={(e) => setEditValues({...editValues, name: e.target.value})}
+                                                        className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-orange-500 outline-none text-slate-900 dark:text-white"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 block">Quantidade</label>
+                                                    <div className="flex items-center">
+                                                        <button 
+                                                          onClick={() => setEditValues({...editValues, quantity: Math.max(0.1, editValues.quantity - 1)})}
+                                                          className="w-10 h-10 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-l-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold"
+                                                        >-</button>
+                                                        <input 
+                                                            type="number"
+                                                            step="0.1"
+                                                            value={editValues.quantity}
+                                                            onChange={(e) => setEditValues({...editValues, quantity: parseFloat(e.target.value)})}
+                                                            className="w-full h-10 border-y border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-center focus:ring-0 outline-none text-slate-900 dark:text-white font-medium"
+                                                        />
+                                                        <button 
+                                                          onClick={() => setEditValues({...editValues, quantity: editValues.quantity + 1})}
+                                                          className="w-10 h-10 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-r-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold"
+                                                        >+</button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 block">Preço Unit. (R$)</label>
+                                                    <input 
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={editValues.price || ''}
+                                                        onChange={(e) => setEditValues({...editValues, price: parseFloat(e.target.value)})}
+                                                        placeholder="0.00"
+                                                        className="w-full p-2.5 h-10 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-orange-500 outline-none text-slate-900 dark:text-white text-right font-medium"
+                                                    />
+                                                </div>
+                                                
+                                                <div className="col-span-2 pt-2 flex items-center justify-between gap-3">
+                                                    <button 
+                                                        onClick={() => onRemove(item.id)}
+                                                        className="flex items-center gap-2 text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 font-medium px-2 py-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors text-sm"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" /> Excluir Item
+                                                    </button>
+                                                    <Button onClick={handleSaveEdit} className="bg-orange-600 hover:bg-orange-700 px-6">
+                                                        Salvar
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            ))}
-                        </div>
+                            );
+                        })}
                     </div>
-                ))}
-            </div>
+                </div>
+            ))}
         </div>
 
         {/* FOOTER TOTAL */}
@@ -513,71 +535,65 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                 </div>
             ) : (
                 shoppingHistory.map(entry => {
+                    const isExpanded = expandedHistoryId === entry.id;
                     const isEditing = editingHistoryId === entry.id;
                     const dataToShow = isEditing && tempHistoryEntry ? tempHistoryEntry : entry;
 
+                    // Date formatting for the card
+                    const dateObj = new Date(entry.date);
+                    const dateStr = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'short' });
+                    // Capitalize first letter and remove dot from month if present
+                    const formattedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1).replace('.', '');
+
                     return (
-                        <div key={entry.id} className={`bg-white dark:bg-slate-900 rounded-xl shadow-sm border overflow-hidden ${isEditing ? 'border-orange-500 dark:border-orange-500 ring-1 ring-orange-500' : 'border-slate-200 dark:border-slate-800'}`}>
+                        <div 
+                          key={entry.id} 
+                          className={`bg-white dark:bg-slate-900 rounded-2xl shadow-sm border transition-all duration-200 overflow-hidden ${
+                            (isExpanded || isEditing) ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-slate-200 dark:border-slate-800'
+                          }`}
+                        >
+                            {/* Card Header (Click to expand) */}
                             <div 
                                 onClick={() => !isEditing && toggleHistoryExpand(entry.id)}
-                                className={`flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${isEditing ? 'cursor-default' : ''}`}
+                                className={`flex items-center p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${isEditing ? 'cursor-default' : ''}`}
                             >
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg text-emerald-600">
-                                        <Calendar className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        {isEditing ? (
-                                            <input 
-                                                type="date" 
-                                                value={dataToShow.date ? new Date(dataToShow.date).toISOString().split('T')[0] : ''}
-                                                onChange={(e) => setTempHistoryEntry(prev => prev ? {...prev, date: new Date(e.target.value).toISOString()} : null)}
-                                                className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-sm font-semibold text-slate-800 dark:text-white mb-1"
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
-                                        ) : (
-                                            <p className="font-semibold text-slate-800 dark:text-white">
-                                                {new Date(entry.date).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                                            </p>
-                                        )}
-                                        <p className="text-xs text-slate-500">
-                                            {Array.isArray(dataToShow.items) ? dataToShow.items.length : 0} itens
-                                        </p>
-                                    </div>
+                                {/* Left Icon */}
+                                <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center flex-shrink-0 text-emerald-600 mr-4">
+                                    <Calendar className="w-6 h-6" />
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <span className={`font-bold ${isEditing ? 'text-orange-600 dark:text-orange-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                        R$ {dataToShow.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </span>
-                                    
-                                    {!isEditing && (
-                                        <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-3 ml-2">
-                                            <button 
-                                                onClick={(e) => handleHistoryEditClick(e, entry)}
-                                                className="text-slate-400 hover:text-blue-500 p-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                                                title="Editar"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button 
-                                                onClick={(e) => handleHistoryDeleteClick(e, entry.id)}
-                                                className="text-slate-400 hover:text-rose-500 p-1.5 rounded hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
-                                                title="Excluir"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    )}
 
-                                    {!isEditing && (
-                                        expandedHistoryId === entry.id ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />
+                                {/* Center Info */}
+                                <div className="flex-1 min-w-0">
+                                    {isEditing ? (
+                                         <input 
+                                            type="date" 
+                                            value={dataToShow.date ? new Date(dataToShow.date).toISOString().split('T')[0] : ''}
+                                            onChange={(e) => setTempHistoryEntry(prev => prev ? {...prev, date: new Date(e.target.value).toISOString()} : null)}
+                                            className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-sm font-semibold text-slate-800 dark:text-white mb-1 w-full"
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    ) : (
+                                        <h3 className="text-lg font-medium text-slate-900 dark:text-white truncate">
+                                            {formattedDate}
+                                        </h3>
                                     )}
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                                        {Array.isArray(dataToShow.items) ? dataToShow.items.length : 0} itens
+                                    </p>
+                                </div>
+
+                                {/* Right Price */}
+                                <div className="text-right flex-shrink-0 pl-2">
+                                    <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                                        R$ {dataToShow.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </div>
                                 </div>
                             </div>
 
-                            {expandedHistoryId === entry.id && (
-                                <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 p-4">
-                                    <div className="grid gap-2">
+                            {/* Expanded Content */}
+                            {(isExpanded || isEditing) && (
+                                <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 p-4 animate-in slide-in-from-top-2">
+                                    <div className="grid gap-2 mb-4">
                                         {Array.isArray(dataToShow.items) && dataToShow.items.map((item, idx) => (
                                             <div key={idx} className="flex justify-between items-center text-sm p-2 rounded bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                                                 {isEditing ? (
@@ -614,11 +630,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                                 ) : (
                                                     // VIEW MODE ITEM ROW
                                                     <>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-medium text-slate-700 dark:text-slate-300">{item.name}</span>
-                                                            <span className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{item.quantity}x</span>
+                                                        <div className="flex items-center gap-2 overflow-hidden">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 flex-shrink-0"></div>
+                                                            <span className="font-medium text-slate-700 dark:text-slate-300 truncate">{item.name}</span>
+                                                            <span className="text-xs text-slate-400 whitespace-nowrap">x{item.quantity}</span>
                                                         </div>
-                                                        <span className="font-medium text-slate-600 dark:text-slate-400">
+                                                        <span className="font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap ml-2">
                                                             R$ {((item.price || 0) * item.quantity).toFixed(2)}
                                                         </span>
                                                     </>
@@ -627,16 +644,30 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                         ))}
                                     </div>
                                     
-                                    {isEditing && (
-                                        <div className="flex justify-end gap-3 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
-                                            <Button variant="secondary" size="sm" onClick={handleHistoryCancel}>
-                                                Cancelar
-                                            </Button>
-                                            <Button size="sm" onClick={handleHistorySave} className="bg-orange-600 hover:bg-orange-700">
-                                                Salvar Alterações
-                                            </Button>
-                                        </div>
-                                    )}
+                                    <div className="flex justify-end gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                                        {isEditing ? (
+                                            <>
+                                                <Button variant="secondary" size="sm" onClick={handleHistoryCancel}>
+                                                    Cancelar
+                                                </Button>
+                                                <Button size="sm" onClick={handleHistorySave} className="bg-orange-600 hover:bg-orange-700">
+                                                    Salvar Alterações
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button 
+                                                    onClick={(e) => handleHistoryDeleteClick(e, entry.id)}
+                                                    className="flex items-center gap-2 text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 font-medium px-3 py-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors text-sm"
+                                                >
+                                                    <Trash2 className="w-4 h-4" /> Excluir
+                                                </button>
+                                                <Button size="sm" onClick={(e) => handleHistoryEditClick(e, entry)} variant="secondary" className="bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600">
+                                                    <Edit2 className="w-4 h-4 mr-2" /> Editar
+                                                </Button>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
