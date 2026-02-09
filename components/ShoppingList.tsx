@@ -341,7 +341,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-orange-500 outline-none text-slate-900 dark:text-white"
                     />
                 </div>
-                <div className="w-full md:w-40">
+                {/* CATEGORY INPUT: Hidden on Mobile as requested */}
+                <div className="hidden md:block w-full md:w-40">
                     <input 
                         type="text" 
                         placeholder="Categoria" 
@@ -404,12 +405,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                             {group.items.map(item => (
                                 <div 
                                     key={item.id} 
-                                    className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-white dark:hover:bg-slate-800 transition-colors ${item.isChecked ? 'opacity-50 bg-slate-50 dark:bg-slate-900' : ''} ${editingId === item.id ? 'ring-2 ring-orange-500 ring-inset bg-orange-50 dark:bg-orange-900/10' : ''}`}
+                                    className={`border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-white dark:hover:bg-slate-800 transition-colors ${item.isChecked ? 'opacity-50 bg-slate-50 dark:bg-slate-900' : ''} ${editingId === item.id ? 'ring-2 ring-orange-500 ring-inset bg-orange-50 dark:bg-orange-900/10' : ''}`}
                                 >
-                                    <div className="flex items-center gap-3 flex-1">
+                                    <div className="flex items-start gap-3 p-3">
+                                        {/* 1. Left: Checkbox */}
                                         <button 
                                             onClick={() => handleToggle(item)}
-                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                                            className={`mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
                                                 item.isChecked 
                                                 ? 'bg-emerald-500 border-emerald-500 text-white' 
                                                 : 'border-slate-300 dark:border-slate-600 hover:border-emerald-500'
@@ -418,49 +420,51 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                             {item.isChecked && <Check className="w-3.5 h-3.5" />}
                                         </button>
                                         
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`font-medium text-slate-800 dark:text-white block truncate ${item.isChecked ? 'line-through text-slate-500 dark:text-slate-500' : ''}`}>
-                                                    {item.name}
+                                        {/* 2. Middle: Name and Meta Info */}
+                                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                            <span className={`font-medium text-slate-800 dark:text-white block truncate ${item.isChecked ? 'line-through text-slate-500 dark:text-slate-500' : ''}`}>
+                                                {item.name}
+                                            </span>
+                                            
+                                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded shadow-sm border border-slate-100 dark:border-slate-700">
+                                                    {item.quantity} un
                                                 </span>
                                                 {item.price && !item.isChecked && getPriceComparison(item.name, item.price)}
                                             </div>
                                         </div>
                                         
-                                        <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-1 rounded shadow-sm border border-slate-100 dark:border-slate-700 min-w-[2rem] text-center whitespace-nowrap">
-                                            {item.quantity} un
-                                        </span>
-                                    </div>
+                                        {/* 3. Right: Price Input and Actions Stacked */}
+                                        <div className="flex flex-col items-end gap-2 pl-2">
+                                            <div className="flex items-center gap-1 justify-end">
+                                                <span className="text-slate-400 text-xs">R$</span>
+                                                <input 
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={item.price || ''}
+                                                    placeholder="0.00"
+                                                    onChange={(e) => updateItemPrice(item, e.target.value)}
+                                                    className="w-20 p-1 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-right focus:border-orange-500 focus:outline-none"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            </div>
 
-                                    <div className="flex items-center gap-3 justify-between sm:justify-end w-full sm:w-auto pl-9 sm:pl-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-slate-400 text-sm">R$</span>
-                                            <input 
-                                                type="number"
-                                                step="0.01"
-                                                value={item.price || ''}
-                                                placeholder="0.00"
-                                                onChange={(e) => updateItemPrice(item, e.target.value)}
-                                                className="w-20 p-1 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-right focus:border-orange-500 focus:outline-none"
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
-                                        </div>
-
-                                        <div className="flex items-center gap-1">
-                                        <button 
-                                            onClick={() => handleEdit(item)}
-                                            className="text-slate-400 hover:text-blue-500 transition-colors p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                            title="Editar item"
-                                        >
-                                            <Edit2 className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={() => onRemove(item.id)}
-                                            className="text-slate-400 hover:text-rose-500 transition-colors p-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20"
-                                            title="Remover item"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                            <div className="flex items-center gap-1 justify-end">
+                                                <button 
+                                                    onClick={() => handleEdit(item)}
+                                                    className="text-slate-400 hover:text-blue-500 transition-colors p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                    title="Editar item"
+                                                >
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                <button 
+                                                    onClick={() => onRemove(item.id)}
+                                                    className="text-slate-400 hover:text-rose-500 transition-colors p-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                                                    title="Remover item"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
