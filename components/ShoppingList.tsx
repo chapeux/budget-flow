@@ -13,6 +13,8 @@ interface ShoppingListProps {
   onRemove: (id: string) => void;
   onClearAll: () => void;
   onFinalize?: () => void;
+  onRemoveHistory?: (id: string) => void;
+  onUpdateHistory?: (entry: ShoppingHistoryEntry) => void;
 }
 
 // Robust UUID generator
@@ -34,7 +36,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   onUpdate,
   onRemove,
   onClearAll,
-  onFinalize
+  onFinalize,
+  onRemoveHistory,
+  onUpdateHistory
 }) => {
   const [activeTab, setActiveTab] = useState<'LIST' | 'HISTORY'>('LIST');
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
@@ -46,6 +50,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // History Edit State
+  const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
+  const [tempHistoryEntry, setTempHistoryEntry] = useState<ShoppingHistoryEntry | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,7 +214,60 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   };
 
   const toggleHistoryExpand = (id: string) => {
+      // Don't toggle if we are editing this one (clicks inside input might propagate)
+      if (editingHistoryId === id) return;
       setExpandedHistoryId(expandedHistoryId === id ? null : id);
+  };
+
+  // --- History Edit Handlers ---
+
+  const handleHistoryEditClick = (e: React.MouseEvent, entry: ShoppingHistoryEntry) => {
+      e.stopPropagation();
+      setEditingHistoryId(entry.id);
+      setTempHistoryEntry(JSON.parse(JSON.stringify(entry))); // Deep copy
+      setExpandedHistoryId(entry.id); // Ensure expanded
+  };
+
+  const handleHistoryDeleteClick = (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      if (window.confirm("Tem certeza que deseja excluir este registro do histórico?")) {
+          if (onRemoveHistory) onRemoveHistory(id);
+      }
+  };
+
+  const handleHistorySave = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (tempHistoryEntry && onUpdateHistory) {
+          // Recalculate total just in case
+          const newTotal = tempHistoryEntry.items.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
+          onUpdateHistory({ ...tempHistoryEntry, totalAmount: newTotal });
+      }
+      setEditingHistoryId(null);
+      setTempHistoryEntry(null);
+  };
+
+  const handleHistoryCancel = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setEditingHistoryId(null);
+      setTempHistoryEntry(null);
+  };
+
+  const handleHistoryItemChange = (idx: number, field: keyof ShoppingItem, value: any) => {
+      if (!tempHistoryEntry) return;
+      const newItems = [...tempHistoryEntry.items];
+      newItems[idx] = { ...newItems[idx], [field]: value };
+      
+      // Auto recalc total for local state
+      const newTotal = newItems.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
+      
+      setTempHistoryEntry({ ...tempHistoryEntry, items: newItems, totalAmount: newTotal });
+  };
+
+  const handleHistoryItemRemove = (idx: number) => {
+      if (!tempHistoryEntry) return;
+      const newItems = tempHistoryEntry.items.filter((_, i) => i !== idx);
+      const newTotal = newItems.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
+      setTempHistoryEntry({ ...tempHistoryEntry, items: newItems, totalAmount: newTotal });
   };
 
   return (
@@ -446,52 +507,136 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                     <p>Nenhum histórico de compras encontrado.</p>
                 </div>
             ) : (
-                shoppingHistory.map(entry => (
-                    <div key={entry.id} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-                        <div 
-                            onClick={() => toggleHistoryExpand(entry.id)}
-                            className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg text-emerald-600">
-                                    <Calendar className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-slate-800 dark:text-white">
-                                        {new Date(entry.date).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                                    </p>
-                                    <p className="text-xs text-slate-500">
-                                        {Array.isArray(entry.items) ? entry.items.length : 0} itens
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                    R$ {entry.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </span>
-                                {expandedHistoryId === entry.id ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                            </div>
-                        </div>
+                shoppingHistory.map(entry => {
+                    const isEditing = editingHistoryId === entry.id;
+                    const dataToShow = isEditing && tempHistoryEntry ? tempHistoryEntry : entry;
 
-                        {expandedHistoryId === entry.id && (
-                            <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 p-4">
-                                <div className="grid gap-2">
-                                    {Array.isArray(entry.items) && entry.items.map((item, idx) => (
-                                        <div key={idx} className="flex justify-between items-center text-sm p-2 rounded bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-medium text-slate-700 dark:text-slate-300">{item.name}</span>
-                                                <span className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{item.quantity}x</span>
-                                            </div>
-                                            <span className="font-medium text-slate-600 dark:text-slate-400">
-                                                R$ {((item.price || 0) * item.quantity).toFixed(2)}
-                                            </span>
+                    return (
+                        <div key={entry.id} className={`bg-white dark:bg-slate-900 rounded-xl shadow-sm border overflow-hidden ${isEditing ? 'border-orange-500 dark:border-orange-500 ring-1 ring-orange-500' : 'border-slate-200 dark:border-slate-800'}`}>
+                            <div 
+                                onClick={() => !isEditing && toggleHistoryExpand(entry.id)}
+                                className={`flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${isEditing ? 'cursor-default' : ''}`}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg text-emerald-600">
+                                        <Calendar className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        {isEditing ? (
+                                            <input 
+                                                type="date" 
+                                                value={dataToShow.date ? new Date(dataToShow.date).toISOString().split('T')[0] : ''}
+                                                onChange={(e) => setTempHistoryEntry(prev => prev ? {...prev, date: new Date(e.target.value).toISOString()} : null)}
+                                                className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-sm font-semibold text-slate-800 dark:text-white mb-1"
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                        ) : (
+                                            <p className="font-semibold text-slate-800 dark:text-white">
+                                                {new Date(entry.date).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                            </p>
+                                        )}
+                                        <p className="text-xs text-slate-500">
+                                            {Array.isArray(dataToShow.items) ? dataToShow.items.length : 0} itens
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className={`font-bold ${isEditing ? 'text-orange-600 dark:text-orange-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                        R$ {dataToShow.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </span>
+                                    
+                                    {!isEditing && (
+                                        <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-3 ml-2">
+                                            <button 
+                                                onClick={(e) => handleHistoryEditClick(e, entry)}
+                                                className="text-slate-400 hover:text-blue-500 p-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                                title="Editar"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button 
+                                                onClick={(e) => handleHistoryDeleteClick(e, entry.id)}
+                                                className="text-slate-400 hover:text-rose-500 p-1.5 rounded hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+                                                title="Excluir"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
                                         </div>
-                                    ))}
+                                    )}
+
+                                    {!isEditing && (
+                                        expandedHistoryId === entry.id ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />
+                                    )}
                                 </div>
                             </div>
-                        )}
-                    </div>
-                ))
+
+                            {expandedHistoryId === entry.id && (
+                                <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 p-4">
+                                    <div className="grid gap-2">
+                                        {Array.isArray(dataToShow.items) && dataToShow.items.map((item, idx) => (
+                                            <div key={idx} className="flex justify-between items-center text-sm p-2 rounded bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+                                                {isEditing ? (
+                                                    // EDIT MODE ITEM ROW
+                                                    <div className="flex flex-1 gap-2 items-center">
+                                                        <input 
+                                                            className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 text-slate-800 dark:text-white text-xs"
+                                                            value={item.name}
+                                                            onChange={(e) => handleHistoryItemChange(idx, 'name', e.target.value)}
+                                                            placeholder="Nome"
+                                                        />
+                                                        <input 
+                                                            className="w-16 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 text-slate-800 dark:text-white text-xs text-center"
+                                                            type="number"
+                                                            value={item.quantity}
+                                                            onChange={(e) => handleHistoryItemChange(idx, 'quantity', parseFloat(e.target.value))}
+                                                            placeholder="Qtd"
+                                                        />
+                                                        <input 
+                                                            className="w-20 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 text-slate-800 dark:text-white text-xs text-right"
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={item.price}
+                                                            onChange={(e) => handleHistoryItemChange(idx, 'price', parseFloat(e.target.value))}
+                                                            placeholder="Preço"
+                                                        />
+                                                        <button 
+                                                            onClick={() => handleHistoryItemRemove(idx)}
+                                                            className="text-rose-400 hover:text-rose-600 p-1"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    // VIEW MODE ITEM ROW
+                                                    <>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-medium text-slate-700 dark:text-slate-300">{item.name}</span>
+                                                            <span className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{item.quantity}x</span>
+                                                        </div>
+                                                        <span className="font-medium text-slate-600 dark:text-slate-400">
+                                                            R$ {((item.price || 0) * item.quantity).toFixed(2)}
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    
+                                    {isEditing && (
+                                        <div className="flex justify-end gap-3 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+                                            <Button variant="secondary" size="sm" onClick={handleHistoryCancel}>
+                                                Cancelar
+                                            </Button>
+                                            <Button size="sm" onClick={handleHistorySave} className="bg-orange-600 hover:bg-orange-700">
+                                                Salvar Alterações
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })
             )}
         </div>
       )}
