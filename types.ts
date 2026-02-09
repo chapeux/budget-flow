@@ -18,6 +18,34 @@ export interface Expense {
   date: string;
 }
 
+// New Interface for Credit Cards
+export interface CreditCard {
+  id: string;
+  name: string;
+  limitAmount: number;
+  closingDay: number; // Dia de fechamento da fatura
+  dueDay: number; // Dia de vencimento
+  color?: string;
+}
+
+// New Interface for Shopping List
+export interface ShoppingItem {
+  id: string;
+  name: string;
+  quantity: number;
+  isChecked: boolean;
+  category?: string; // Ex: "🍎 Frutas", "🧼 Limpeza"
+  price?: number; // Preço unitário estimado ou real
+}
+
+// Shopping History Record
+export interface ShoppingHistoryEntry {
+  id: string;
+  date: string;
+  totalAmount: number;
+  items: ShoppingItem[]; // Stored as JSON
+}
+
 // Used for Real/Daily Transactions
 export interface Transaction {
   id: string;
@@ -30,6 +58,7 @@ export interface Transaction {
   date: string; // Data da compra
   referenceDate?: string; // Mês de competência/Fatura (ISO string)
   paymentMethod?: string;
+  cardId?: string; // Optional: Link to a credit card
 }
 
 export interface Investment {

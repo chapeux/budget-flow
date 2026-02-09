@@ -4,7 +4,7 @@ import { Income, Expense, Investment, Transaction, TransactionType } from "../ty
 export type AIProvider = 'groq' | 'gemini';
 
 // --- CONFIGURATION ---
-const getGroqApiKey = () => import.meta.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
+const getGroqApiKey = () => process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
 const getGeminiApiKey = () => process.env.API_KEY || process.env.GEMINI_API_KEY;
 
 // --- PROMPT GENERATORS ---
@@ -82,6 +82,27 @@ const createCategorizationPrompt = (descriptions: string[], categories: string[]
     
     Retorne APENAS um objeto JSON onde a chave é a descrição original e o valor é a categoria escolhida.
     Exemplo de saída: { "Uber *Trip": "Transporte", "Mercado Livre": "Compras" }
+  `;
+};
+
+const createShoppingPrompt = (items: string[]): string => {
+  return `
+    Você é um organizador de compras inteligente.
+    Tenho uma lista de itens de supermercado/compras.
+    
+    Sua tarefa é:
+    1. Categorizar cada item adicionando um emoji correspondente (ex: "🍎 Hortifruti").
+    2. Estimar o preço unitário médio (em Reais - BRL) para este item no Brasil.
+    
+    Itens: ${JSON.stringify(items)}
+    
+    Retorne APENAS um objeto JSON onde a chave é o nome do item e o valor é um objeto contendo "category" e "price".
+    Exemplo de saída: 
+    { 
+      "maçã": { "category": "🍎 Hortifruti", "price": 1.50 },
+      "detergente": { "category": "🧼 Limpeza", "price": 3.20 },
+      "picanha": { "category": "🥩 Carnes", "price": 89.90 }
+    }
   `;
 };
 
@@ -231,6 +252,42 @@ export const suggestCategories = async (
     return JSON.parse(result); 
   } catch (error) {
     console.error("AI Categorization Error:", error);
+    return {};
+  }
+};
+
+interface ShoppingSuggestion {
+  category: string;
+  price: number;
+}
+
+export const suggestShoppingCategories = async (
+  items: string[],
+  provider: AIProvider = 'gemini'
+): Promise<Record<string, ShoppingSuggestion>> => {
+  if (items.length === 0) return {};
+
+  const activeProvider = resolveProvider(provider);
+  const uniqueItems = Array.from(new Set(items));
+  const prompt = createShoppingPrompt(uniqueItems);
+
+  try {
+    let result = '';
+    if (activeProvider === 'gemini') {
+      result = await callGemini(prompt, true);
+    } else {
+      result = await callGroq(prompt, true);
+    }
+
+    const jsonStart = result.indexOf('{');
+    const jsonEnd = result.lastIndexOf('}');
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      const jsonStr = result.substring(jsonStart, jsonEnd + 1);
+      return JSON.parse(jsonStr);
+    }
+    return JSON.parse(result);
+  } catch (error) {
+    console.error("AI Shopping Categorization Error:", error);
     return {};
   }
 };

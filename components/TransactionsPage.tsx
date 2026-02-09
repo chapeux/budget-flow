@@ -3,14 +3,14 @@ import {
   Upload, Search, Edit2, Trash2, X, Check, 
   Sparkles, Loader2, PlusCircle, ArrowUpCircle, ArrowDownCircle, ArrowRightCircle, 
   Wallet, TrendingUp, MoreVertical, ChevronRight, ChevronLeft, AlertCircle, CheckCircle2,
-  Save, Wand2, Circle, Filter, ArrowLeftRight, XCircle
+  Save, Wand2, Circle, Filter, ArrowLeftRight, XCircle, CreditCard as CardIcon
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, BarChart, Bar
 } from 'recharts';
 import * as pdfjsLib from 'pdfjs-dist';
-import { Transaction, ExpenseType, TransactionType } from '../types';
+import { Transaction, ExpenseType, TransactionType, CreditCard } from '../types';
 import { Button } from './ui/Button';
 import { suggestCategories, parseBankStatement } from '../services/aiService';
 
@@ -27,6 +27,7 @@ try {
 interface TransactionsPageProps {
   transactions: Transaction[];
   categories: string[];
+  cards?: CreditCard[];
   onAdd: (transaction: Transaction) => void;
   onUpdate: (transaction: Transaction) => void;
   onRemove: (id: string) => void;
@@ -38,6 +39,7 @@ const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 export const TransactionsPage: React.FC<TransactionsPageProps> = ({
   transactions,
   categories,
+  cards = [],
   onAdd,
   onUpdate,
   onRemove,
@@ -62,12 +64,12 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [isParsingPdf, setIsParsingPdf] = useState(false);
   const [importReferenceDate, setImportReferenceDate] = useState('');
+  const [importTargetCard, setImportTargetCard] = useState(''); // ID of the card to associate import
 
   // Edit Mode State
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<Transaction>>({});
 
-  // Manual Add Form State
+  // Manual Add/Edit Form State
   const [newTransDescription, setNewTransDescription] = useState('');
   const [newTransAmount, setNewTransAmount] = useState('');
   const [newTransCategory, setNewTransCategory] = useState(categories[0] || 'Outros');
@@ -76,6 +78,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
   const [newTransType, setNewTransType] = useState<ExpenseType>('VARIABLE');
   const [newTransKind, setNewTransKind] = useState<TransactionType>('EXPENSE');
   const [newTransStatus, setNewTransStatus] = useState<'DONE' | 'PENDING'>('DONE');
+  const [newTransCard, setNewTransCard] = useState('');
 
   // --- DATE NAVIGATION HANDLERS ---
   
@@ -275,8 +278,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
         refDateIso = new Date(`${newTransRefDate}-01`).toISOString();
     }
 
-    onAdd({
-        id: crypto.randomUUID(),
+    const payload = {
         description: newTransDescription,
         amount: parseFloat(newTransAmount),
         category: newTransCategory,
@@ -284,12 +286,38 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
         referenceDate: refDateIso,
         type: newTransType,
         transactionType: newTransKind,
-        status: newTransStatus
-    });
+        status: newTransStatus,
+        cardId: newTransCard || undefined
+    };
 
+    if (editingId) {
+        onUpdate({
+            id: editingId,
+            ...payload
+        });
+        setEditingId(null);
+    } else {
+        onAdd({
+            id: crypto.randomUUID(),
+            ...payload
+        });
+    }
+
+    resetForm();
+    setIsAdding(false);
+  };
+
+  const resetForm = () => {
     setNewTransDescription('');
     setNewTransAmount('');
-    setIsAdding(false);
+    setNewTransCard('');
+    setNewTransCategory(categories[0] || 'Outros');
+    setNewTransDate(new Date().toISOString().split('T')[0]);
+    setNewTransRefDate(new Date().toISOString().split('T')[0].slice(0, 7));
+    setNewTransType('VARIABLE');
+    setNewTransKind('EXPENSE');
+    setNewTransStatus('DONE');
+    setEditingId(null);
   };
 
   const handleStatusToggle = (t: Transaction) => {
@@ -478,20 +506,33 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
         if (t.transactionType !== 'INCOME' && importReferenceDate) {
             refDate = new Date(`${importReferenceDate}-01`).toISOString();
         }
-        return { ...t, referenceDate: refDate };
+        return { 
+            ...t, 
+            referenceDate: refDate,
+            cardId: importTargetCard || undefined // Map selected card
+        };
     });
     transactionsToImport.forEach(t => onAdd(t));
     setParsedTransactions([]);
     setIsImporting(false);
   };
 
-  const startEdit = (t: Transaction) => { setEditingId(t.id); setEditForm({...t}); };
-  const saveEdit = (e: React.FormEvent) => { 
-      e.preventDefault();
-      if(editingId && editForm.description) { 
-          onUpdate(editForm as Transaction); 
-          setEditingId(null); 
-      }
+  const startEdit = (t: Transaction) => { 
+      setEditingId(t.id);
+      
+      // Populate form fields
+      setNewTransDescription(t.description);
+      setNewTransAmount(t.amount.toString());
+      setNewTransCategory(t.category);
+      setNewTransDate(t.date.split('T')[0]);
+      setNewTransRefDate((t.referenceDate || t.date).slice(0, 7));
+      setNewTransType(t.type || 'VARIABLE');
+      setNewTransKind(t.transactionType);
+      setNewTransStatus(t.status);
+      setNewTransCard(t.cardId || '');
+      
+      // Open Modal
+      setIsAdding(true);
   };
 
   const displayValue = (val: number) => isPrivacyEnabled ? '••••••' : val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -651,6 +692,21 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
                                 className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-sm"
                              />
                         </div>
+                        
+                        {/* CARD SELECTOR FOR IMPORT */}
+                        <div className="text-sm flex items-center gap-2">
+                             <span className="text-slate-500 dark:text-slate-400">Vincular Cartão:</span>
+                             <select
+                                value={importTargetCard}
+                                onChange={(e) => setImportTargetCard(e.target.value)}
+                                className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-sm max-w-[150px]"
+                             >
+                                <option value="">Nenhum / Débito</option>
+                                {cards.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                             </select>
+                        </div>
                      </div>
                      <div className="flex gap-2">
                         <Button onClick={handleAutoCategorize} variant="secondary" size="sm" disabled={isCategorizing}>
@@ -718,9 +774,9 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
                         <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg text-blue-600">
                             <PlusCircle className="w-5 h-5" />
                         </div>
-                        Nova Transação
+                        {editingId ? 'Editar Transação' : 'Nova Transação'}
                     </h3>
-                    <button onClick={() => setIsAdding(false)} className="text-slate-400 hover:text-rose-500 transition-colors"><X className="w-6 h-6" /></button>
+                    <button onClick={() => { setIsAdding(false); resetForm(); }} className="text-slate-400 hover:text-rose-500 transition-colors"><X className="w-6 h-6" /></button>
                 </div>
                 <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div className="col-span-2 flex gap-2 mb-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
@@ -759,6 +815,23 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
                          </div>
                      )}
                      
+                     {/* CARD SELECTION */}
+                     {newTransKind === 'EXPENSE' && cards.length > 0 && (
+                         <div className="col-span-2">
+                            <label className="text-xs font-semibold text-slate-500 uppercase">Cartão de Crédito</label>
+                            <select 
+                                className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" 
+                                value={newTransCard} 
+                                onChange={e => setNewTransCard(e.target.value)}
+                            >
+                                <option value="">Nenhum / Débito</option>
+                                {cards.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                         </div>
+                     )}
+
                      {/* STATUS CHECKBOX */}
                      <div className="col-span-2">
                         <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 cursor-pointer">
@@ -776,8 +849,10 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
                      </div>
 
                      <div className="col-span-2 pt-4 flex gap-3">
-                         <Button type="button" variant="secondary" className="flex-1" onClick={() => setIsAdding(false)}>Cancelar</Button>
-                         <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700">Salvar Transação</Button>
+                         <Button type="button" variant="secondary" className="flex-1" onClick={() => { setIsAdding(false); resetForm(); }}>Cancelar</Button>
+                         <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700">
+                             {editingId ? 'Salvar Alterações' : 'Salvar Transação'}
+                         </Button>
                      </div>
                 </form>
             </div>
@@ -975,7 +1050,14 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
                                             {t.transactionType === 'INCOME' ? <ArrowUpCircle className="w-4 h-4"/> : <ArrowDownCircle className="w-4 h-4"/>}
                                         </div>
                                         <div>
-                                            <p className="font-medium text-slate-800 dark:text-white">{t.description}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-medium text-slate-800 dark:text-white">{t.description}</p>
+                                                {t.cardId && cards.find(c => c.id === t.cardId) && (
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
+                                                        {cards.find(c => c.id === t.cardId)?.name}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <p className="text-xs text-slate-500">{new Date(t.date).toLocaleDateString()}</p>
                                         </div>
                                     </div>

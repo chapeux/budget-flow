@@ -72,11 +72,15 @@ export const Auth = () => {
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden relative z-10 border border-slate-100 dark:border-slate-800">
-        <div className="p-8 bg-emerald-600 text-center">
-          <div className="mx-auto bg-white/20 w-16 h-16 rounded-xl flex items-center justify-center mb-4 backdrop-blur-sm">
-            <Wallet className="w-8 h-8 text-white" />
+        <div className="p-8 bg-emerald-600 text-center flex flex-col items-center">
+          <div className="bg-white p-2 rounded-xl mb-4 shadow-lg">
+            <img 
+                src="https://i.imgur.com/iS5ZfNx.png" 
+                alt="Ativva Logo" 
+                className="w-16 h-16 object-contain"
+            />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">BudgetFlow AI</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">Ativva</h1>
           <p className="text-emerald-100">Organize suas finanças com inteligência</p>
         </div>
 
@@ -124,7 +128,7 @@ export const Auth = () => {
 
             <Button 
               type="submit" 
-              className="w-full justify-center py-3" 
+              className="w-full justify-center py-3 bg-emerald-600 hover:bg-emerald-700" 
               disabled={loading}
               isLoading={loading}
             >
