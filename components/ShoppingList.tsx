@@ -193,21 +193,22 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       const diff = currentPrice - lastPrice;
       const pct = (diff / lastPrice) * 100;
+      const lastPriceFormatted = lastPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       
       if (Math.abs(diff) < 0.01) return <span className="text-xs text-slate-400">=</span>;
 
       if (diff > 0) {
           return (
-              <div className="flex items-center gap-1 text-[10px] text-rose-500 font-medium bg-rose-50 dark:bg-rose-900/20 px-1.5 py-0.5 rounded">
+              <div className="flex items-center gap-1 text-[10px] text-rose-500 font-medium bg-rose-50 dark:bg-rose-900/20 px-1.5 py-0.5 rounded" title={`Preço anterior: R$ ${lastPriceFormatted}`}>
                   <TrendingUp className="w-3 h-3" />
-                  <span>+{pct.toFixed(0)}%</span>
+                  <span>+{pct.toFixed(0)}% (R$ {lastPriceFormatted})</span>
               </div>
           );
       } else {
           return (
-             <div className="flex items-center gap-1 text-[10px] text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded">
+             <div className="flex items-center gap-1 text-[10px] text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded" title={`Preço anterior: R$ ${lastPriceFormatted}`}>
                  <TrendingDown className="w-3 h-3" />
-                 <span>{pct.toFixed(0)}%</span>
+                 <span>{pct.toFixed(0)}% (R$ {lastPriceFormatted})</span>
              </div>
           );
       }
