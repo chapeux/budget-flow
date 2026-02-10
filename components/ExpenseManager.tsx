@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Tag, ShoppingBag, PlusCircle } from 'lucide-react';
+import { Plus, Trash2, Tag, ShoppingBag, PlusCircle, Check, X, Save, Edit2 } from 'lucide-react';
 import { Expense, ExpenseType } from '../types';
 import { Button } from './ui/Button';
 
@@ -7,6 +7,7 @@ interface ExpenseManagerProps {
   expenses: Expense[];
   categories: string[];
   onAdd: (expense: Expense) => void;
+  onUpdate?: (expense: Expense) => void;
   onRemove: (id: string) => void;
   onAddCategory: (category: string) => void;
   totalIncome: number;
@@ -18,6 +19,7 @@ export const ExpenseManager: React.FC<ExpenseManagerProps> = ({
   expenses, 
   categories, 
   onAdd, 
+  onUpdate,
   onRemove,
   onAddCategory,
   totalIncome,
@@ -32,6 +34,10 @@ export const ExpenseManager: React.FC<ExpenseManagerProps> = ({
   
   const [newCategory, setNewCategory] = useState('');
   const [isAddingCategory, setIsAddingCategory] = useState(false);
+
+  // Edit State
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<Expense | null>(null);
 
   // Sync category state when categories prop changes (e.g. data load)
   useEffect(() => {
@@ -64,6 +70,24 @@ export const ExpenseManager: React.FC<ExpenseManagerProps> = ({
       setCategory(newCategory.trim());
       setNewCategory('');
       setIsAddingCategory(false);
+    }
+  };
+
+  const handleExpand = (expense: Expense) => {
+    if (expandedId === expense.id) {
+        setExpandedId(null);
+        setEditValues(null);
+    } else {
+        setExpandedId(expense.id);
+        setEditValues({ ...expense });
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (editValues && onUpdate) {
+        onUpdate(editValues);
+        setExpandedId(null);
+        setEditValues(null);
     }
   };
 
@@ -114,6 +138,7 @@ export const ExpenseManager: React.FC<ExpenseManagerProps> = ({
           </div>
         )}
 
+        {/* ADD NEW EXPENSE FORM */}
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
           <div className="md:col-span-4">
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
@@ -181,7 +206,7 @@ export const ExpenseManager: React.FC<ExpenseManagerProps> = ({
           </div>
         </form>
 
-        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
           {expenses.length === 0 ? (
             <div className="text-center py-12 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-700">
               Nenhuma despesa registrada.
@@ -189,46 +214,126 @@ export const ExpenseManager: React.FC<ExpenseManagerProps> = ({
           ) : (
             expenses.map((expense) => {
               const { value: pct, label: pctLabel } = getPercentageInfo(expense.amount);
+              const isExpanded = expandedId === expense.id;
+
               return (
-                <div key={expense.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/30 rounded-lg border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all group">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${
-                      expense.type === 'FIXED' 
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-900' 
-                        : 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border-orange-100 dark:border-orange-900'
-                    }`}>
-                      {expense.type === 'FIXED' ? 'F' : 'V'}
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-slate-900 dark:text-white">{expense.name}</h4>
-                      <div className="flex gap-2 text-xs text-slate-500 dark:text-slate-400">
-                        <span className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-700 dark:text-slate-300 font-medium border border-slate-200 dark:border-slate-600">{expense.category}</span>
-                        <span>{new Date(expense.date).toLocaleDateString()}</span>
+                <div 
+                    key={expense.id} 
+                    className={`bg-white dark:bg-slate-900 rounded-2xl border transition-all duration-200 overflow-hidden ${
+                        isExpanded 
+                        ? 'border-blue-500 ring-1 ring-blue-500 shadow-lg' 
+                        : 'border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                >
+                  <div 
+                    className="p-4 cursor-pointer flex items-center justify-between"
+                    onClick={() => handleExpand(expense)}
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Icon Circle */}
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0 ${
+                        expense.type === 'FIXED' 
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
+                          : 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
+                      }`}>
+                        {expense.type === 'FIXED' ? 'F' : 'V'}
+                      </div>
+                      
+                      {/* Name & Category Pill */}
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-slate-900 dark:text-white truncate text-base leading-tight">
+                            {expense.name}
+                        </h4>
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                            {expense.category}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="font-bold text-rose-600 dark:text-rose-400">
-                        {isPrivacyEnabled 
-                          ? '••••••' 
-                          : `- R$ ${expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                        }
-                      </div>
-                      {pct > 0 && !isPrivacyEnabled && (
-                        <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
-                          {pct.toFixed(1)}% {pctLabel}
+
+                    {/* Amount & Percentage */}
+                    <div className="text-right flex-shrink-0 ml-2">
+                        <div className="font-bold text-rose-600 dark:text-rose-400 text-base whitespace-nowrap">
+                            {isPrivacyEnabled 
+                            ? '••••••' 
+                            : `-R$ ${expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                            }
                         </div>
-                      )}
+                        {pct > 0 && !isPrivacyEnabled && (
+                            <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                                {pct.toFixed(1)}% {pctLabel}
+                            </div>
+                        )}
                     </div>
-                    <button
-                      onClick={() => onRemove(expense.id)}
-                      className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 border border-transparent hover:border-rose-100 dark:hover:border-rose-900"
-                      aria-label="Remover despesa"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
+
+                  {/* Expanded Edit Form */}
+                  {isExpanded && editValues && (
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 block">Descrição</label>
+                                <input 
+                                    type="text"
+                                    value={editValues.name}
+                                    onChange={(e) => setEditValues({...editValues, name: e.target.value})}
+                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 block">Valor</label>
+                                <input 
+                                    type="number"
+                                    step="0.01"
+                                    value={editValues.amount}
+                                    onChange={(e) => setEditValues({...editValues, amount: parseFloat(e.target.value)})}
+                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 block">Categoria</label>
+                                <select 
+                                    value={editValues.category}
+                                    onChange={(e) => setEditValues({...editValues, category: e.target.value})}
+                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 dark:text-white"
+                                >
+                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 block">Tipo</label>
+                                <div className="flex rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-1">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setEditValues({...editValues, type: 'FIXED'})}
+                                        className={`flex-1 text-xs py-2 rounded font-medium transition-colors ${editValues.type === 'FIXED' ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'}`}
+                                    >Fixa</button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setEditValues({...editValues, type: 'VARIABLE'})}
+                                        className={`flex-1 text-xs py-2 rounded font-medium transition-colors ${editValues.type === 'VARIABLE' ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'}`}
+                                    >Variável</button>
+                                </div>
+                            </div>
+
+                            <div className="col-span-1 md:col-span-2 pt-2 flex justify-between gap-3">
+                                <button 
+                                    onClick={() => onRemove(expense.id)}
+                                    className="flex items-center gap-2 text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 font-medium px-4 py-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors text-sm"
+                                >
+                                    <Trash2 className="w-4 h-4" /> Excluir
+                                </button>
+                                <div className="flex gap-2">
+                                    <Button variant="secondary" onClick={() => setExpandedId(null)} className="bg-white dark:bg-slate-800">
+                                        Cancelar
+                                    </Button>
+                                    <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700">
+                                        Salvar
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                  )}
                 </div>
               );
             })
