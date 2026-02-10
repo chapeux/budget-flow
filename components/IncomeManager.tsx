@@ -119,8 +119,8 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomes, onAdd, on
                     onClick={() => handleExpand(income)}
                   >
                     <div className="flex items-center gap-4">
-                      {/* Icon Circle */}
-                      <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-xl font-bold flex-shrink-0 text-emerald-700 dark:text-emerald-400">
+                      {/* Icon Circle - Hidden on Mobile */}
+                      <div className="hidden sm:flex w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 items-center justify-center text-xl font-bold flex-shrink-0 text-emerald-700 dark:text-emerald-400">
                         {income.personName.charAt(0).toUpperCase()}
                       </div>
                       
@@ -129,7 +129,7 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomes, onAdd, on
                         <h4 className="font-bold text-slate-900 dark:text-white truncate text-base leading-tight">
                             {income.personName}
                         </h4>
-                        <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 whitespace-nowrap">
                             Renda Mensal
                         </span>
                       </div>
