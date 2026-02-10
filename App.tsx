@@ -211,8 +211,8 @@ export default function App() {
                 id: c.id,
                 name: c.name,
                 limitAmount: c.limit_amount,
-                closingDay: c.closing_day,
-                dueDay: c.due_day,
+                closing_day: c.closing_day,
+                due_day: c.due_day,
                 color: c.color
             }));
             setCards(mappedCards);
@@ -337,6 +337,21 @@ export default function App() {
     }
   };
 
+  const updateIncome = async (updatedIncome: Income) => {
+    try {
+        const { error } = await supabase.from('incomes').update({
+            person_name: updatedIncome.personName,
+            amount: updatedIncome.amount,
+            description: updatedIncome.description
+        }).eq('id', updatedIncome.id);
+
+        if (error) throw error;
+        setIncomes(prev => prev.map(i => i.id === updatedIncome.id ? updatedIncome : i));
+    } catch (err) {
+        console.error('Error updating income:', err);
+    }
+  };
+
   const removeIncome = async (id: string) => {
     try {
       const { error } = await supabase.from('incomes').delete().eq('id', id);
@@ -368,6 +383,23 @@ export default function App() {
     } catch (err) {
       console.error('Error adding expense:', err);
     }
+  };
+
+  const updateExpense = async (updatedExpense: Expense) => {
+      try {
+          const { error } = await supabase.from('expenses').update({
+              name: updatedExpense.name,
+              amount: updatedExpense.amount,
+              category: updatedExpense.category,
+              type: updatedExpense.type,
+              date: updatedExpense.date
+          }).eq('id', updatedExpense.id);
+
+          if (error) throw error;
+          setExpenses(prev => prev.map(e => e.id === updatedExpense.id ? updatedExpense : e));
+      } catch (err) {
+          console.error('Error updating expense:', err);
+      }
   };
 
   const removeExpense = async (id: string) => {
@@ -978,6 +1010,7 @@ export default function App() {
                 <IncomeManager 
                   incomes={incomes} 
                   onAdd={addIncome} 
+                  onUpdate={updateIncome}
                   onRemove={removeIncome}
                   isPrivacyEnabled={isPrivacyMode} 
                 />
@@ -986,6 +1019,7 @@ export default function App() {
                   expenses={expenses} 
                   categories={allCategories}
                   onAdd={addExpense} 
+                  onUpdate={updateExpense}
                   onRemove={removeExpense}
                   onAddCategory={addCategory}
                   totalIncome={totalIncome}
