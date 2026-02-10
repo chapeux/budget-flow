@@ -544,6 +544,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                     const dateStr = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'short' });
                     // Capitalize first letter and remove dot from month if present
                     const formattedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1).replace('.', '');
+                    
+                    // Mobile date format (dd/mm/yyyy)
+                    const mobileDate = dateObj.toLocaleDateString('pt-BR');
 
                     return (
                         <div 
@@ -574,7 +577,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                         />
                                     ) : (
                                         <h3 className="text-lg font-medium text-slate-900 dark:text-white truncate">
-                                            {formattedDate}
+                                            <span className="md:hidden">{mobileDate}</span>
+                                            <span className="hidden md:inline">{formattedDate}</span>
                                         </h3>
                                     )}
                                     <p className="text-sm text-slate-500 dark:text-slate-400">
