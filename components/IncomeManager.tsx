@@ -1,18 +1,23 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, DollarSign, User } from 'lucide-react';
+import { Plus, Trash2, DollarSign, User, Save, X } from 'lucide-react';
 import { Income } from '../types';
 import { Button } from './ui/Button';
 
 interface IncomeManagerProps {
   incomes: Income[];
   onAdd: (income: Income) => void;
+  onUpdate?: (income: Income) => void;
   onRemove: (id: string) => void;
   isPrivacyEnabled: boolean;
 }
 
-export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomes, onAdd, onRemove, isPrivacyEnabled }) => {
+export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomes, onAdd, onUpdate, onRemove, isPrivacyEnabled }) => {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
+
+  // Edit State
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<Income | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +31,24 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomes, onAdd, on
 
     setName('');
     setAmount('');
+  };
+
+  const handleExpand = (income: Income) => {
+    if (expandedId === income.id) {
+        setExpandedId(null);
+        setEditValues(null);
+    } else {
+        setExpandedId(income.id);
+        setEditValues({ ...income });
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (editValues && onUpdate) {
+        onUpdate(editValues);
+        setExpandedId(null);
+        setEditValues(null);
+    }
   };
 
   return (
@@ -79,34 +102,96 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomes, onAdd, on
               Nenhuma renda cadastrada.
             </div>
           ) : (
-            incomes.map((income) => (
-              <div key={income.id} className="flex items-center justify-between p-4 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-lg border border-emerald-100 dark:border-emerald-900/30 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs border border-emerald-200 dark:border-emerald-800">
-                    {income.personName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-slate-900 dark:text-white">{income.personName}</p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">Renda Mensal</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                    {isPrivacyEnabled 
-                      ? '••••••' 
-                      : `+ R$ ${income.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                    }
-                  </span>
-                  <button
-                    onClick={() => onRemove(income.id)}
-                    className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors p-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
-                    aria-label="Remover renda"
+            incomes.map((income) => {
+              const isExpanded = expandedId === income.id;
+              
+              return (
+                <div 
+                    key={income.id} 
+                    className={`bg-white dark:bg-slate-900 rounded-2xl border transition-all duration-200 overflow-hidden ${
+                        isExpanded 
+                        ? 'border-emerald-500 ring-1 ring-emerald-500 shadow-lg' 
+                        : 'border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                >
+                  <div 
+                    className="p-4 cursor-pointer flex items-center justify-between"
+                    onClick={() => handleExpand(income)}
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                    <div className="flex items-center gap-4">
+                      {/* Icon Circle */}
+                      <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-xl font-bold flex-shrink-0 text-emerald-700 dark:text-emerald-400">
+                        {income.personName.charAt(0).toUpperCase()}
+                      </div>
+                      
+                      {/* Name & Badge */}
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-slate-900 dark:text-white truncate text-base leading-tight">
+                            {income.personName}
+                        </h4>
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                            Renda Mensal
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Amount */}
+                    <div className="text-right flex-shrink-0 ml-2">
+                        <div className="font-bold text-emerald-700 dark:text-emerald-400 text-base whitespace-nowrap">
+                            {isPrivacyEnabled 
+                            ? '••••••' 
+                            : `+R$ ${income.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                            }
+                        </div>
+                    </div>
+                  </div>
+
+                  {/* Expanded Edit Form */}
+                  {isExpanded && editValues && (
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 block">Nome</label>
+                                <input 
+                                    type="text"
+                                    value={editValues.personName}
+                                    onChange={(e) => setEditValues({...editValues, personName: e.target.value})}
+                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 block">Valor</label>
+                                <input 
+                                    type="number"
+                                    step="0.01"
+                                    value={editValues.amount}
+                                    onChange={(e) => setEditValues({...editValues, amount: parseFloat(e.target.value)})}
+                                    className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white"
+                                />
+                            </div>
+                            
+                            <div className="col-span-1 md:col-span-2 pt-2 flex justify-between gap-3">
+                                <button 
+                                    onClick={() => onRemove(income.id)}
+                                    className="flex items-center gap-2 text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 font-medium px-4 py-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors text-sm"
+                                >
+                                    <Trash2 className="w-4 h-4" /> Excluir
+                                </button>
+                                <div className="flex gap-2">
+                                    <Button variant="secondary" onClick={() => setExpandedId(null)} className="bg-white dark:bg-slate-800">
+                                        Cancelar
+                                    </Button>
+                                    <Button onClick={handleSaveEdit} className="bg-emerald-600 hover:bg-emerald-700">
+                                        Salvar
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
