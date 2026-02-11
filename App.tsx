@@ -283,7 +283,7 @@ export default function App() {
     };
 
     fetchData();
-  }, [session]);
+  }, [session?.user?.id]); // CHANGED DEPENDENCY HERE
 
   // Derived State
   const allCategories = useMemo(() => {
@@ -725,6 +725,23 @@ export default function App() {
     }
   };
 
+  const updateInvestment = async (updatedInv: Investment) => {
+    if (!session?.user?.id) return;
+    try {
+      const { error } = await supabase.from('investments').update({
+        name: updatedInv.name,
+        amount: updatedInv.amount,
+        annual_rate: updatedInv.annualRate,
+        category: updatedInv.category
+      }).eq('id', updatedInv.id);
+
+      if (error) throw error;
+      setInvestments(prev => prev.map(i => i.id === updatedInv.id ? updatedInv : i));
+    } catch (err) {
+      console.error('Error updating investment:', err);
+    }
+  };
+
   const removeInvestment = async (id: string) => {
     try {
       const { error } = await supabase.from('investments').delete().eq('id', id);
@@ -760,6 +777,30 @@ export default function App() {
         }
     } catch (err: any) {
         console.error('Error adding scheduled event:', err);
+    }
+  };
+
+  const updateScheduledEvent = async (updatedEvent: ScheduledEvent) => {
+    if (!session?.user?.id) return;
+    try {
+        const payload = {
+            name: updatedEvent.name,
+            type: updatedEvent.type,
+            amount: updatedEvent.amount,
+            month: updatedEvent.month,
+            year: updatedEvent.year || null,
+        };
+
+        const { error } = await supabase
+            .from('scheduled_events')
+            .update(payload)
+            .eq('id', updatedEvent.id);
+
+        if (error) throw error;
+
+        setScheduledEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+    } catch (err) {
+        console.error('Error updating scheduled event:', err);
     }
   };
 
@@ -1032,7 +1073,9 @@ export default function App() {
                         investments={investments}
                         scheduledEvents={scheduledEvents}
                         onAdd={addInvestment}
+                        onUpdate={updateInvestment}
                         onAddOneTime={addScheduledEvent}
+                        onUpdateOneTime={updateScheduledEvent}
                         onRemove={removeInvestment}
                         onRemoveOneTime={removeScheduledEvent}
                         isPrivacyEnabled={isPrivacyMode}
@@ -1040,6 +1083,7 @@ export default function App() {
                     <ScheduledEventManager
                         events={scheduledEvents}
                         onAdd={addScheduledEvent}
+                        onUpdate={updateScheduledEvent}
                         onRemove={removeScheduledEvent}
                         isPrivacyEnabled={isPrivacyMode}
                     />
