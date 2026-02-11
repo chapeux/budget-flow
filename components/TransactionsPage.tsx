@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Upload, Search, Edit2, Trash2, X, Check, 
   Sparkles, Loader2, PlusCircle, ArrowUpCircle, ArrowDownCircle, ArrowRightCircle, 
   Wallet, TrendingUp, MoreVertical, ChevronRight, ChevronLeft, AlertCircle, CheckCircle2,
-  Save, Wand2, Circle, Filter, ArrowLeftRight, XCircle, CreditCard as CardIcon
+  Save, Wand2, Circle, Filter, ArrowLeftRight, XCircle, CreditCard as CardIcon, Plus
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
@@ -52,6 +52,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DONE' | 'PENDING'>('ALL');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE'>('ALL');
+  const [showFab, setShowFab] = useState(false);
   
   // Pending Card State
   const [pendingView, setPendingView] = useState<'EXPENSES' | 'INCOMES'>('EXPENSES');
@@ -79,6 +80,20 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
   const [newTransKind, setNewTransKind] = useState<TransactionType>('EXPENSE');
   const [newTransStatus, setNewTransStatus] = useState<'DONE' | 'PENDING'>('DONE');
   const [newTransCard, setNewTransCard] = useState('');
+
+  // Scroll Listener for FAB
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 200) {
+        setShowFab(true);
+      } else {
+        setShowFab(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // --- DATE NAVIGATION HANDLERS ---
   
@@ -128,7 +143,6 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
   }, [transactions, monthFilter, searchTerm, selectedCategoryFilter, statusFilter, typeFilter]);
 
   // Balance Logic (Cumulative / Bank-like)
-  // Calculates STRICTLY based on date strings to avoid timezone issues.
   const balanceInfo = useMemo(() => {
     if (!monthFilter) return { initial: 0, current: 0, forecast: 0 };
     
@@ -222,9 +236,6 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
 
   // Pending Expenses Logic (Dynamic based on View)
   const pendingInfo = useMemo(() => {
-      // Logic: Iterate over transactions for the current month
-      // Filter based on pendingView state (Expenses or Incomes)
-      
       const currentMonthKey = monthFilter;
 
       const relevantTransactions = transactions.filter(t => {
@@ -342,9 +353,6 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
       setSelectedCategoryFilter(null);
   };
 
-  const hasActiveFilters = searchTerm !== '' || statusFilter !== 'ALL' || typeFilter !== 'ALL' || selectedCategoryFilter !== null;
-
-  // ... (Parsing logic remains the same, assuming imports default to DONE) ...
   const parseCSV = (text: string) => {
     const lines = text.split('\n');
     const newTransactions: Transaction[] = [];
@@ -519,8 +527,6 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
 
   const startEdit = (t: Transaction) => { 
       setEditingId(t.id);
-      
-      // Populate form fields
       setNewTransDescription(t.description);
       setNewTransAmount(t.amount.toString());
       setNewTransCategory(t.category);
@@ -530,8 +536,6 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
       setNewTransKind(t.transactionType);
       setNewTransStatus(t.status);
       setNewTransCard(t.cardId || '');
-      
-      // Open Modal
       setIsAdding(true);
   };
 
@@ -542,96 +546,123 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
   return (
     <div className="space-y-6">
       
-      {/* HEADER ACTIONS */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-         <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-             
-             {/* MONTH NAVIGATOR */}
-             <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700">
-                <button onClick={handlePrevMonth} className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-md transition-all text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white shadow-sm hover:shadow">
-                    <ChevronLeft className="w-4 h-4"/>
-                </button>
-                <span className="px-4 text-sm font-semibold capitalize min-w-[140px] text-center text-slate-700 dark:text-white select-none">
-                    {formatMonthDisplay(monthFilter)}
-                </span>
-                <button onClick={handleNextMonth} className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-md transition-all text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white shadow-sm hover:shadow">
-                    <ChevronRight className="w-4 h-4"/>
-                </button>
-             </div>
+      {/* HEADER ACTIONS - RESPONSIVE LAYOUT */}
+      <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            {/* Left Group: Nav, Search, Filters */}
+            <div className="flex flex-col md:flex-row md:items-center gap-4 flex-1">
+                
+                {/* Month Navigator */}
+                <div className="flex justify-center md:justify-start">
+                    <div className="flex items-center gap-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 shadow-sm">
+                        <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">
+                            <ChevronLeft className="w-4 h-4"/>
+                        </button>
+                        <span className="font-semibold text-slate-800 dark:text-white min-w-[140px] md:min-w-[160px] text-center capitalize select-none text-sm">
+                            {formatMonthDisplay(monthFilter)}
+                        </span>
+                        <button onClick={handleNextMonth} className="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">
+                            <ChevronRight className="w-4 h-4"/>
+                        </button>
+                    </div>
+                </div>
 
-             <div className="relative flex-1 md:w-64 w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                    type="text" 
-                    placeholder="Buscar transação..." 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-             </div>
+                {/* Search */}
+                <div className="relative w-full md:w-64 lg:w-80">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4"/>
+                    <input 
+                        value={searchTerm} 
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Buscar transação..."
+                        className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800 transition-all outline-none text-sm text-slate-800 dark:text-white placeholder-slate-400"
+                    />
+                </div>
 
-             <div className="flex gap-2 w-full sm:w-auto flex-wrap">
-                 {/* TYPE FILTER */}
-                 <div className="relative flex-1 sm:flex-none min-w-[140px]">
-                     <select 
-                        value={typeFilter}
-                        onChange={(e) => setTypeFilter(e.target.value as any)}
-                        className={`w-full pl-3 pr-8 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none transition-colors ${
-                            typeFilter !== 'ALL'
-                              ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300 font-medium'
-                              : 'bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700'
-                        }`}
-                     >
-                         <option value="ALL">Todos os Tipos</option>
-                         <option value="INCOME">Receitas</option>
-                         <option value="EXPENSE">Despesas</option>
-                     </select>
-                     <ArrowLeftRight className={`absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${
-                         typeFilter !== 'ALL' ? 'text-blue-500 dark:text-blue-400' : 'text-slate-400'
-                     }`} />
-                 </div>
+                {/* Filters (DESKTOP ONLY) */}
+                <div className="hidden md:flex md:gap-2 w-full md:w-auto">
+                    {/* Type Filter */}
+                    <div className="relative w-full md:w-40">
+                        <select 
+                            value={typeFilter}
+                            onChange={(e) => setTypeFilter(e.target.value as any)}
+                            className="w-full pl-3 pr-8 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-medium focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer hover:border-blue-300 transition-colors shadow-sm"
+                        >
+                            <option value="ALL">Todos os Tipos</option>
+                            <option value="INCOME">Receitas</option>
+                            <option value="EXPENSE">Despesas</option>
+                        </select>
+                        <ArrowLeftRight className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                    </div>
+                    
+                    {/* Status Filter */}
+                    <div className="relative w-full md:w-40">
+                        <select 
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as any)}
+                            className="w-full pl-3 pr-8 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-medium focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer hover:border-blue-300 transition-colors shadow-sm"
+                        >
+                            <option value="ALL">Todos Status</option>
+                            <option value="DONE">Efetivadas</option>
+                            <option value="PENDING">Pendentes</option>
+                        </select>
+                        <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
 
-                 {/* STATUS FILTER */}
-                 <div className="relative flex-1 sm:flex-none min-w-[140px]">
-                     <select 
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value as any)}
-                        className={`w-full pl-3 pr-8 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none transition-colors ${
-                            statusFilter !== 'ALL'
-                              ? 'bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-900/30 dark:border-orange-700 dark:text-orange-300 font-medium'
-                              : 'bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700'
-                        }`}
-                     >
-                         <option value="ALL">Todos Status</option>
-                         <option value="DONE">Efetivadas</option>
-                         <option value="PENDING">Pendentes</option>
-                     </select>
-                     <Filter className={`absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${
-                         statusFilter !== 'ALL' ? 'text-orange-500 dark:text-orange-400' : 'text-slate-400'
-                     }`} />
-                 </div>
+            </div>
 
-                 {/* CLEAR FILTERS BUTTON */}
-                 {hasActiveFilters && (
-                    <button
-                        onClick={clearFilters}
-                        className="flex items-center gap-1 px-3 py-2 text-xs font-medium text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors border border-transparent hover:border-rose-100"
-                        title="Limpar todos os filtros"
-                    >
-                        <XCircle className="w-4 h-4" />
-                        <span className="hidden sm:inline">Limpar</span>
-                    </button>
-                 )}
-             </div>
-         </div>
-         <div className="flex gap-2 w-full md:w-auto">
-             <Button onClick={() => setIsImporting(!isImporting)} variant="secondary" size="sm">
-                <Upload className="w-4 h-4 mr-2" /> Importar
-             </Button>
-             <Button onClick={() => setIsAdding(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-full w-10 h-10 p-0 flex items-center justify-center md:w-auto md:h-auto md:px-4 md:py-2 md:rounded-lg">
-                <PlusCircle className="w-5 h-5 md:mr-2" /> <span className="hidden md:inline">Nova Transação</span>
-             </Button>
-         </div>
+            {/* Right Group: Buttons */}
+            <div className="grid grid-cols-2 gap-4 md:flex md:gap-3 w-full md:w-auto">
+                <Button 
+                    variant="secondary" 
+                    onClick={() => setIsImporting(!isImporting)} 
+                    className="w-full md:w-auto justify-center py-2.5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium"
+                >
+                    <Upload className="mr-2 h-4 w-4"/> Importar
+                </Button>
+                {/* "New Transaction" Button - Visible on Mobile now */}
+                <Button 
+                    onClick={() => setIsAdding(true)} 
+                    className="w-full md:w-auto justify-center py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all"
+                >
+                    <PlusCircle className="mr-2 h-4 w-4"/> <span className="truncate">Nova Transação</span>
+                </Button>
+            </div>
+
+        </div>
+      </div>
+
+      {/* MOBILE ONLY FILTERS (Placed below header, above content) */}
+      <div className="grid grid-cols-2 gap-3 md:hidden">
+          {/* Type Filter */}
+          <div className="relative">
+              <select 
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value as any)}
+                  className="w-full pl-3 pr-8 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-sm font-medium focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer shadow-sm"
+              >
+                  <option value="ALL">Todos os Tipos</option>
+                  <option value="INCOME">Receitas</option>
+                  <option value="EXPENSE">Despesas</option>
+              </select>
+              <ArrowLeftRight className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+          </div>
+          
+          {/* Status Filter */}
+          <div className="relative">
+              <select 
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="w-full pl-3 pr-8 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-sm font-medium focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer shadow-sm"
+              >
+                  <option value="ALL">Todos Status</option>
+                  <option value="DONE">Efetivadas</option>
+                  <option value="PENDING">Pendentes</option>
+              </select>
+              <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+          </div>
       </div>
 
       {/* IMPORT MODAL */}
@@ -778,7 +809,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
                     </h3>
                     <button onClick={() => { setIsAdding(false); resetForm(); }} className="text-slate-400 hover:text-rose-500 transition-colors"><X className="w-6 h-6" /></button>
                 </div>
-                <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form onSubmit={handleManualSubmit} className="grid grid-cols-2 gap-4">
                      <div className="col-span-2 flex gap-2 mb-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
                          {(['EXPENSE', 'INCOME', 'TRANSFER'] as const).map(k => (
                              <button
@@ -794,24 +825,34 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
                         <label className="text-xs font-semibold text-slate-500 uppercase">Descrição</label>
                         <input type="text" required className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" value={newTransDescription} onChange={e => setNewTransDescription(e.target.value)} />
                      </div>
-                     <div>
+                     
+                     <div className={newTransKind === 'INCOME' ? "col-span-2 md:col-span-1" : "col-span-1"}>
                         <label className="text-xs font-semibold text-slate-500 uppercase">Valor</label>
                         <input type="number" step="0.01" required className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" value={newTransAmount} onChange={e => setNewTransAmount(e.target.value)} />
                      </div>
-                     <div>
+                     
+                     <div className={newTransKind === 'INCOME' ? "col-span-2 md:col-span-1" : "col-span-1"}>
                         <label className="text-xs font-semibold text-slate-500 uppercase">Categoria</label>
                         <select className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" value={newTransCategory} onChange={e => setNewTransCategory(e.target.value)}>
                             {categories.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                      </div>
-                     <div>
+                     
+                     <div className={newTransKind === 'INCOME' ? "col-span-2 md:col-span-1" : "col-span-1"}>
                         <label className="text-xs font-semibold text-slate-500 uppercase">Data Real</label>
                         <input type="date" required className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" value={newTransDate} onChange={e => setNewTransDate(e.target.value)} />
                      </div>
+                     
                      {newTransKind !== 'INCOME' && (
-                         <div>
+                         <div className="col-span-1">
                             <label className="text-xs font-semibold text-slate-500 uppercase">Data Referência</label>
-                            <input type="month" required className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" value={newTransRefDate} onChange={e => setNewTransRefDate(e.target.value)} />
+                            <input 
+                                type="month" 
+                                required 
+                                className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" 
+                                value={newTransRefDate} 
+                                onChange={e => setNewTransRefDate(e.target.value)} 
+                            />
                          </div>
                      )}
                      
@@ -1189,6 +1230,16 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
         </div>
 
       </div>
+
+      {/* FLOATING ACTION BUTTON (MOBILE ONLY) - Visible on scroll */}
+      <button
+        onClick={() => setIsAdding(true)}
+        className={`md:hidden fixed bottom-24 right-4 w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center z-50 hover:bg-emerald-700 transition-all duration-300 active:scale-95 shadow-emerald-600/30 ${showFab ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0'}`}
+        aria-label="Nova Transação"
+      >
+        <Plus className="w-8 h-8" />
+      </button>
+
     </div>
   );
 };
