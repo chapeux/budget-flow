@@ -124,16 +124,18 @@ export const ExpenseManager: React.FC<ExpenseManagerProps> = ({
         {isAddingCategory && (
           <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 animate-in fade-in slide-in-from-top-2">
             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Criar Nova Categoria</label>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-3">
               <input 
                 type="text" 
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
-                className="flex-1 rounded-md border-slate-300 dark:border-slate-600 border p-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full sm:flex-1 rounded-md border-slate-300 dark:border-slate-600 border p-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="Ex: Assinaturas, Pets..."
               />
-              <Button size="sm" onClick={handleCreateCategory} disabled={!newCategory}>Criar</Button>
-              <Button size="sm" variant="secondary" onClick={() => setIsAddingCategory(false)} className="bg-white dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">Cancelar</Button>
+              <div className="flex gap-2">
+                  <Button size="sm" onClick={handleCreateCategory} disabled={!newCategory} className="flex-1 sm:flex-none justify-center">Criar</Button>
+                  <Button size="sm" variant="secondary" onClick={() => setIsAddingCategory(false)} className="flex-1 sm:flex-none justify-center bg-white dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">Cancelar</Button>
+              </div>
             </div>
           </div>
         )}
