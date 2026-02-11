@@ -148,7 +148,7 @@ export const ScheduledEventManager: React.FC<ScheduledEventManagerProps> = ({
           </div>
         </form>
 
-        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="space-y-3">
           {seasonalEvents.length === 0 ? (
             <div className="text-center py-8 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-700">
               Nenhum evento sazonal configurado.
