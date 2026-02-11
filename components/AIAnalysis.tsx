@@ -66,35 +66,23 @@ export const AIAnalysis: React.FC<AIAnalysisProps> = ({ incomes, expenses, inves
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden relative transition-all ring-1 ring-slate-100 dark:ring-slate-800">
       {/* Header Bar */}
-      <div className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 p-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-lg">
+            <div className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-lg shrink-0">
                 <BrainCircuit className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-                <h2 className="text-lg font-bold text-slate-800 dark:text-white">Assistente Financeiro</h2>
+                <h2 className="text-lg font-bold text-slate-800 dark:text-white leading-tight">Assistente Financeiro</h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Inteligência artificial para suas finanças</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* Provider Selector */}
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">IA Modelo:</span>
-                <select 
-                    value={provider} 
-                    onChange={(e) => setProvider(e.target.value as AIProvider)}
-                    className="text-sm font-semibold text-slate-700 dark:text-slate-200 bg-transparent border-none focus:ring-0 cursor-pointer outline-none"
-                >
-                    <option value="groq">Groq (Llama 3)</option>
-                    <option value="gemini">Gemini 1.5</option>
-                </select>
-            </div>
-            
-            <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
-                <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button 
+            onClick={() => setIsOpen(false)} 
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
+          >
+              <X className="w-5 h-5" />
+          </button>
       </div>
 
       <div className="p-0">
