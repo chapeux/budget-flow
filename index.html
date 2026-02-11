@@ -29,6 +29,10 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+      :root {
+        font-size: 14px; /* Fixes the "huge font" issue by scaling down 1rem from 16px to 14px */
+      }
+
       html {
         -webkit-text-size-adjust: 100%;
         -moz-text-size-adjust: 100%;
@@ -37,6 +41,8 @@
       
       body {
         font-family: 'Inter', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
       
       /* Light theme scrollbar */
