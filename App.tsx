@@ -211,8 +211,8 @@ export default function App() {
                 id: c.id,
                 name: c.name,
                 limitAmount: c.limit_amount,
-                closing_day: c.closing_day,
-                due_day: c.due_day,
+                closingDay: c.closing_day,
+                dueDay: c.due_day,
                 color: c.color
             }));
             setCards(mappedCards);
@@ -994,43 +994,43 @@ export default function App() {
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 transition-colors duration-300">
         {currentView === 'dashboard' ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Renda Planejada</h3>
                   <PlusCircle className="w-5 h-5 text-emerald-500" />
                 </div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                <p className="text-xl font-bold text-slate-900 dark:text-white truncate" title={displayValue(totalIncome)}>
                   {displayValue(totalIncome)}
                 </p>
               </div>
               
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Teto de Gastos</h3>
                   <TrendingDown className="w-5 h-5 text-rose-500" />
                 </div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                <p className="text-xl font-bold text-slate-900 dark:text-white truncate" title={displayValue(totalBudgetExpenses)}>
                   {displayValue(totalBudgetExpenses)}
                 </p>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Investimentos Fixos</h3>
                   <PieChart className="w-5 h-5 text-blue-500" />
                 </div>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <p className="text-xl font-bold text-blue-600 dark:text-blue-400 truncate" title={displayValue(totalInvestments)}>
                   {displayValue(totalInvestments)}
                 </p>
               </div>
 
-              <div className={`bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors ${freeCash < 0 ? 'border-rose-200 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-900' : ''}`}>
+              <div className={`bg-white dark:bg-slate-900 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors ${freeCash < 0 ? 'border-rose-200 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-900' : ''}`}>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Saldo Livre</h3>
                   <Wallet className="w-5 h-5 text-emerald-500" />
                 </div>
-                <p className={`text-2xl font-bold ${freeCash < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                <p className={`text-xl font-bold truncate ${freeCash < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`} title={displayValue(freeCash)}>
                   {displayValue(freeCash)}
                 </p>
               </div>
