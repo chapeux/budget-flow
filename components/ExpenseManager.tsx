@@ -231,7 +231,7 @@ export const ExpenseManager: React.FC<ExpenseManagerProps> = ({
                     className="p-4 cursor-pointer flex items-center justify-between"
                     onClick={() => handleExpand(expense)}
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 min-w-0">
                       {/* Icon Circle */}
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0 ${
                         expense.type === 'FIXED' 
@@ -242,7 +242,7 @@ export const ExpenseManager: React.FC<ExpenseManagerProps> = ({
                       </div>
                       
                       {/* Name & Category Pill */}
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <h4 className="font-bold text-slate-900 dark:text-white truncate text-base leading-tight">
                             {expense.name}
                         </h4>
