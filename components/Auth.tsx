@@ -153,7 +153,7 @@ export const Auth = () => {
           {/* Text Content - Adjusted margins for closer layout */}
           <div className="px-16 lg:px-24 pt-20 max-w-2xl">
             <h2 className="text-5xl lg:text-6xl font-black leading-tight mb-8 text-slate-900 tracking-tight">
-              Assuma o controle total da sua <span className="text-emerald-500">jornada financeira.</span>
+              A sua jornada financeira <span className="text-emerald-500">Ativva </span> aqui.
             </h2>
           </div>
 
