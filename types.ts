@@ -88,3 +88,5 @@ export interface AnalysisResult {
   savingsPotential: number;
   status: 'healthy' | 'warning' | 'critical';
 }
+
+export type AIAnalysisType = 'BUDGET' | 'INVESTMENT' | 'MONTH_CLOSING';

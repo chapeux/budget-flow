@@ -18,7 +18,8 @@ import { suggestCategories, parseBankStatement } from '../services/aiService';
 try {
   const pdfjs = (pdfjsLib as any).default || pdfjsLib;
   if (pdfjs && pdfjs.GlobalWorkerOptions) {
-    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    // Ensuring version matching for CDN
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
   }
 } catch (e) {
   console.warn('PDF Worker Init Failed', e);

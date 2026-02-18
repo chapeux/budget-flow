@@ -1,11 +1,16 @@
 import { GoogleGenAI } from "@google/genai";
-import { Income, Expense, Investment, Transaction, TransactionType } from "../types";
+import { Income, Expense, Investment, Transaction, TransactionType, AIAnalysisType } from "../types";
 
 export type AIProvider = 'groq' | 'gemini';
 
-// --- CONFIGURATION ---
-const getGroqApiKey = () => import.meta.env.VITE_GROQ_API_KEY;
-const getGeminiApiKey = () => process.env.API_KEY || process.env.GEMINI_API_KEY;
+const getGroqApiKey = () => {
+  try {
+    // @ts-ignore
+    return process.env.GROQ_API_KEY || '';
+  } catch (e) {
+    return '';
+  }
+};
 
 // --- PROMPT GENERATORS ---
 
@@ -38,6 +43,31 @@ const createBudgetPrompt = (incomes: Income[], expenses: Expense[]): string => {
   `;
 };
 
+const createStandardBudgetPrompt = (totalIncome: number, paysRent: boolean, mandatoryExpenses?: string): string => {
+  return `
+    Atue como um consultor financeiro. O usuário tem uma renda total de R$ ${totalIncome.toFixed(2)}.
+    Perfil do usuário: ${paysRent ? 'Paga aluguel/moradia' : 'Não paga aluguel/moradia própria'}.
+    ${mandatoryExpenses ? `RESTRIÇÕES OBRIGATÓRIAS DO USUÁRIO: "${mandatoryExpenses}"` : ''}
+
+    Tarefa:
+    Crie uma estrutura de gastos mensais sugerida baseada na regra 50-30-20 adaptada à realidade brasileira.
+    
+    IMPORTANTE: Se o usuário informou gastos obrigatórios (como faculdade, prestação de carro, etc.), você DEVE incluí-los com os valores exatos solicitados antes de distribuir o restante da renda.
+
+    A resposta DEVE conter duas partes:
+    1. Um texto explicativo em Markdown justificando os valores e como as restrições foram aplicadas.
+    2. No final, uma seção "JSON_DATA" contendo APENAS um array JSON de objetos: { "name", "amount", "category", "type" ('FIXED' | 'VARIABLE'), "isInvestment" (boolean), "annualRate" (number, opcional, apenas se isInvestment for true) }.
+    
+    Categorias de despesas: Moradia, Alimentação, Transporte, Saúde, Lazer, Educação.
+    Categorias de investimentos: Renda Fixa, Ações, Reserva, etc.
+    
+    Se o usuário paga aluguel e não especificou valor, inclua "Aluguel/Moradia" (25-30% da renda).
+    Sempre inclua pelo menos um item com "isInvestment": true.
+    
+    Totalize exatamente R$ ${totalIncome.toFixed(2)} ou deixe uma margem de segurança de 10%.
+  `;
+};
+
 const createInvestmentPrompt = (investments: Investment[], totalIncome: number): string => {
   const investmentList = investments.map(inv => 
     `- ${inv.name} (${inv.category}): R$ ${inv.amount.toFixed(2)} por mês (Rentabilidade est.: ${inv.annualRate}%)`
@@ -67,87 +97,46 @@ const createInvestmentPrompt = (investments: Investment[], totalIncome: number):
   `;
 };
 
-const createCategorizationPrompt = (descriptions: string[], categories: string[]): string => {
+const createMonthClosingPrompt = (plannedExpenses: Expense[], realized: Transaction[], plannedIncomes: Income[]): string => {
+  const categories = Array.from(new Set([...plannedExpenses.map(e => e.category), ...realized.filter(t => t.transactionType !== 'INCOME').map(t => t.category)]));
+  
+  const totalPlannedIncome = plannedIncomes.reduce((s, i) => s + i.amount, 0);
+  const totalRealizedIncome = realized.filter(t => t.transactionType === 'INCOME').reduce((s, t) => s + t.amount, 0);
+  
+  const expenseComparison = categories.map(cat => {
+    const pAmount = plannedExpenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
+    const rAmount = realized.filter(t => t.category === cat && (t.transactionType === 'EXPENSE' || t.transactionType === 'TRANSFER')).reduce((s, t) => s + t.amount, 0);
+    const diff = pAmount - rAmount;
+    return `- ${cat}: Planejado R$ ${pAmount.toFixed(2)} vs Realizado R$ ${rAmount.toFixed(2)} (Diferença: R$ ${diff.toFixed(2)})`;
+  }).join('\n');
+
   return `
-    Você é um assistente contábil inteligente.
-    Tenho uma lista de descrições de transações bancárias e uma lista de categorias permitidas.
-    
-    Sua tarefa é analisar cada descrição e atribuir a categoria mais apropriada da lista fornecida.
-    Se nenhuma categoria parecer adequada, use "Outros".
-    
-    Categorias Permitidas: ${categories.join(', ')}
-    
-    Transações para classificar:
-    ${JSON.stringify(descriptions)}
-    
-    Retorne APENAS um objeto JSON onde a chave é a descrição original e o valor é a categoria escolhida.
-    Exemplo de saída: { "Uber *Trip": "Transporte", "Mercado Livre": "Compras" }
+    Você é um coach financeiro. Analise o fechamento do mês comparando o Planejado (Orçamento) vs Realizado (Transações reais).
+
+    Comparativo de RECEITAS (Renda):
+    - Planejado: R$ ${totalPlannedIncome.toFixed(2)}
+    - Realizado: R$ ${totalRealizedIncome.toFixed(2)}
+    - Diferença: R$ ${(totalRealizedIncome - totalPlannedIncome).toFixed(2)}
+
+    Comparativo de DESPESAS por Categoria:
+    ${expenseComparison}
+
+    Tarefa:
+    1. Comente sobre a Renda: Se o usuário ganhou mais ou menos do que previu e o impacto disso.
+    2. Destaque as 2 categorias de gastos onde o usuário foi mais disciplinado.
+    3. Identifique estouros de orçamento em despesas e sugira ações.
+    4. Dê uma nota de 0 a 10 para o desempenho financeiro global do mês.
+    5. Proponha um ajuste estratégico para o próximo mês.
+
+    Seja encorajador, mas honesto. Use Markdown e português do Brasil.
   `;
-};
-
-const createShoppingPrompt = (items: string[]): string => {
-  return `
-    Você é um organizador de compras inteligente.
-    Tenho uma lista de itens de supermercado/compras.
-    
-    Sua tarefa é:
-    1. Categorizar cada item adicionando um emoji correspondente (ex: "🍎 Hortifruti").
-    2. Estimar o preço unitário médio (em Reais - BRL) para este item no Brasil.
-    
-    Itens: ${JSON.stringify(items)}
-    
-    Retorne APENAS um objeto JSON onde a chave é o nome do item e o valor é um objeto contendo "category" e "price".
-    Exemplo de saída: 
-    { 
-      "maçã": { "category": "🍎 Hortifruti", "price": 1.50 },
-      "detergente": { "category": "🧼 Limpeza", "price": 3.20 },
-      "picanha": { "category": "🥩 Carnes", "price": 89.90 }
-    }
-  `;
-};
-
-const createStatementParsePrompt = (rawText: string): string => {
-  return `
-    Você é um parser de extratos bancários especializado em converter texto não estruturado (de PDFs) em JSON.
-    
-    Abaixo está o texto cru extraído de um extrato bancário ou fatura de cartão. 
-    Identifique as transações individuais contendo Data, Descrição e Valor.
-    
-    Regras:
-    1. Ignore saldos parciais, cabeçalhos de página ou textos irrelevantes.
-    2. Identifique se a transação é uma Receita (INCOME), Despesa (EXPENSE) ou Transferência (TRANSFER).
-    3. Converta todas as datas para o formato ISO YYYY-MM-DD.
-    4. Converta valores para number (float). Se for despesa, retorne o valor absoluto (positivo), pois o tipo define o sinal.
-    
-    Texto Cru:
-    """
-    ${rawText.slice(0, 30000)} 
-    """
-    
-    Responda APENAS com um array JSON válido no seguinte formato:
-    [
-      { "date": "2024-02-28", "description": "Supermercado X", "amount": 150.50, "transactionType": "EXPENSE" },
-      { "date": "2024-02-05", "description": "Salário Mensal", "amount": 5000.00, "transactionType": "INCOME" }
-    ]
-  `;
-};
-
-// --- HELPER: PROVIDER RESOLUTION ---
-
-const resolveProvider = (requestedProvider: AIProvider): AIProvider => {
-  // If Groq requested but no key, fallback to Gemini
-  if (requestedProvider === 'groq' && !getGroqApiKey()) {
-    console.warn("BudgetFlow AI: Chave da API Groq não encontrada. Alternando automaticamente para Gemini.");
-    return 'gemini';
-  }
-  return requestedProvider;
 };
 
 // --- API HANDLERS ---
 
 const callGroq = async (prompt: string, jsonMode = false): Promise<string> => {
   const apiKey = getGroqApiKey();
-  if (!apiKey) throw new Error("Chave da API Groq não encontrada (GROQ_API_KEY).");
+  if (!apiKey) throw new Error("Chave Groq não configurada.");
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -164,7 +153,7 @@ const callGroq = async (prompt: string, jsonMode = false): Promise<string> => {
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(`Erro na API Groq: ${errorData.error?.message || response.statusText}`);
+    throw new Error(`Erro Groq: ${errorData.error?.message || response.statusText}`);
   }
 
   const data = await response.json();
@@ -172,10 +161,7 @@ const callGroq = async (prompt: string, jsonMode = false): Promise<string> => {
 };
 
 const callGemini = async (prompt: string, jsonMode = false): Promise<string> => {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) throw new Error("Chave da API Gemini não encontrada (API_KEY).");
-
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const response = await ai.models.generateContent({
@@ -188,40 +174,59 @@ const callGemini = async (prompt: string, jsonMode = false): Promise<string> => 
     });
     return response.text || "{}";
   } catch (error: any) {
-    throw new Error(`Erro na API Gemini: ${error.message}`);
+    throw new Error(`Erro Gemini: ${error.message}`);
   }
 };
 
 // --- MAIN EXPORTS ---
 
 export const analyzeWithAI = async (
-  type: 'BUDGET' | 'INVESTMENT',
+  type: AIAnalysisType,
   provider: AIProvider,
-  data: { incomes?: Income[], expenses?: Expense[], investments?: Investment[] }
+  data: { incomes?: Income[], expenses?: Expense[], investments?: Investment[], transactions?: Transaction[], paysRent?: boolean }
 ): Promise<string> => {
   
-  const activeProvider = resolveProvider(provider);
   let prompt = '';
-  
   if (type === 'BUDGET') {
-    if (!data.incomes || !data.expenses) throw new Error("Dados insuficientes para análise de orçamento.");
+    if (!data.incomes || !data.expenses) throw new Error("Dados insuficientes.");
     prompt = createBudgetPrompt(data.incomes, data.expenses);
-  } else {
-    if (!data.investments || !data.incomes) throw new Error("Dados insuficientes para análise de investimentos.");
+  } else if (type === 'INVESTMENT') {
+    if (!data.investments || !data.incomes) throw new Error("Dados insuficientes.");
     const totalIncome = data.incomes.reduce((acc, curr) => acc + curr.amount, 0);
     prompt = createInvestmentPrompt(data.investments, totalIncome);
+  } else if (type === 'MONTH_CLOSING') {
+    if (!data.expenses || !data.transactions || !data.incomes) throw new Error("Dados insuficientes.");
+    prompt = createMonthClosingPrompt(data.expenses, data.transactions, data.incomes);
   }
 
-  try {
-    if (activeProvider === 'groq') {
+  if (provider === 'groq' && getGroqApiKey()) {
+    try {
       return await callGroq(prompt);
-    } else {
+    } catch (e) {
+      console.warn("Groq falhou (provavelmente CORS), tentando Gemini como fallback...", e);
       return await callGemini(prompt);
     }
-  } catch (error) {
-    console.error("AI Service Error:", error);
-    throw error;
   }
+
+  return await callGemini(prompt);
+};
+
+export const suggestBasicBudget = async (
+  totalIncome: number,
+  paysRent: boolean,
+  provider: AIProvider = 'gemini',
+  mandatoryExpenses?: string
+): Promise<string> => {
+  const prompt = createStandardBudgetPrompt(totalIncome, paysRent, mandatoryExpenses);
+  
+  if (provider === 'groq' && getGroqApiKey()) {
+    try {
+      return await callGroq(prompt);
+    } catch (e) {
+      return await callGemini(prompt);
+    }
+  }
+  return await callGemini(prompt);
 };
 
 export const suggestCategories = async (
@@ -231,14 +236,17 @@ export const suggestCategories = async (
 ): Promise<Record<string, string>> => {
   if (descriptions.length === 0) return {};
   
-  const activeProvider = resolveProvider(provider);
   const uniqueDescriptions = Array.from(new Set(descriptions));
-  const prompt = createCategorizationPrompt(uniqueDescriptions, categories);
+  const prompt = `Analise as transações e atribua uma categoria das permitidas: ${categories.join(', ')}. Retorne apenas JSON { "descrição": "categoria" }. Transações: ${JSON.stringify(uniqueDescriptions)}`;
   
   try {
     let result = '';
-    if (activeProvider === 'groq') {
-      result = await callGroq(prompt, true);
+    if (provider === 'groq' && getGroqApiKey()) {
+      try {
+        result = await callGroq(prompt, true);
+      } catch (e) {
+        result = await callGemini(prompt, true);
+      }
     } else {
       result = await callGemini(prompt, true);
     }
@@ -246,84 +254,71 @@ export const suggestCategories = async (
     const jsonStart = result.indexOf('{');
     const jsonEnd = result.lastIndexOf('}');
     if (jsonStart !== -1 && jsonEnd !== -1) {
-      const jsonStr = result.substring(jsonStart, jsonEnd + 1);
-      return JSON.parse(jsonStr);
+      return JSON.parse(result.substring(jsonStart, jsonEnd + 1));
     }
     return JSON.parse(result); 
   } catch (error) {
-    console.error("AI Categorization Error:", error);
-    return {};
-  }
-};
-
-interface ShoppingSuggestion {
-  category: string;
-  price: number;
-}
-
-export const suggestShoppingCategories = async (
-  items: string[],
-  provider: AIProvider = 'gemini'
-): Promise<Record<string, ShoppingSuggestion>> => {
-  if (items.length === 0) return {};
-
-  const activeProvider = resolveProvider(provider);
-  const uniqueItems = Array.from(new Set(items));
-  const prompt = createShoppingPrompt(uniqueItems);
-
-  try {
-    let result = '';
-    if (activeProvider === 'gemini') {
-      result = await callGemini(prompt, true);
-    } else {
-      result = await callGroq(prompt, true);
-    }
-
-    const jsonStart = result.indexOf('{');
-    const jsonEnd = result.lastIndexOf('}');
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      const jsonStr = result.substring(jsonStart, jsonEnd + 1);
-      return JSON.parse(jsonStr);
-    }
-    return JSON.parse(result);
-  } catch (error) {
-    console.error("AI Shopping Categorization Error:", error);
+    console.error("AI Error:", error);
     return {};
   }
 };
 
 export const parseBankStatement = async (
-  rawText: string,
+  text: string,
   provider: AIProvider = 'gemini'
-): Promise<Partial<Transaction>[]> => {
-  if (!rawText.trim()) return [];
-
-  const activeProvider = resolveProvider(provider);
-  const prompt = createStatementParsePrompt(rawText);
+): Promise<any[]> => {
+  const prompt = `Extraia transações do extrato bancário. Retorne array JSON de objetos: { "description", "amount", "date" (YYYY-MM-DD), "transactionType" ('INCOME'|'EXPENSE') }. Texto: ${text}`;
 
   try {
     let result = '';
-    
-    if (activeProvider === 'gemini') {
-        result = await callGemini(prompt, true);
-    } else {
+    if (provider === 'groq' && getGroqApiKey()) {
+      try {
         result = await callGroq(prompt, true);
+      } catch (e) {
+        result = await callGemini(prompt, true);
+      }
+    } else {
+      result = await callGemini(prompt, true);
     }
 
-    // Attempt to extract JSON array
     const jsonStart = result.indexOf('[');
     const jsonEnd = result.lastIndexOf(']');
-    
     if (jsonStart !== -1 && jsonEnd !== -1) {
-       const jsonStr = result.substring(jsonStart, jsonEnd + 1);
-       return JSON.parse(jsonStr);
+      return JSON.parse(result.substring(jsonStart, jsonEnd + 1));
     }
-    
-    // Fallback if full text returned
     return JSON.parse(result);
-
   } catch (error) {
-    console.error("AI PDF Parse Error:", error);
-    throw new Error("Falha ao interpretar o PDF com IA. O texto extraído pode estar muito confuso ou a chave de API é inválida.");
+    console.error("Error:", error);
+    return [];
+  }
+};
+
+export const suggestShoppingCategories = async (
+  itemNames: string[],
+  provider: AIProvider = 'gemini'
+): Promise<Record<string, { category: string, price: number }>> => {
+  const prompt = `Para cada item, sugira categoria com emoji e preço médio em BRL. Retorne JSON: { "item": { "category", "price" } }. Itens: ${JSON.stringify(itemNames)}`;
+
+  try {
+    let result = '';
+    if (provider === 'groq' && getGroqApiKey()) {
+      try {
+        result = await callGroq(prompt, true);
+      } catch (e) {
+        result = await callGemini(prompt, true);
+      }
+    } else {
+      result = await callGemini(prompt, true);
+    }
+
+    const jsonStart = result.indexOf('{');
+    const jsonEnd = result.lastIndexOf('}');
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      return JSON.parse(result.substring(jsonStart, jsonEnd + 1));
+    }
+    return JSON.parse(result);
+  } catch (error) {
+    console.error("Error:", error);
+    return {};
   }
 };
