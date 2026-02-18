@@ -5,8 +5,19 @@ export type AIProvider = 'groq' | 'gemini';
 
 const getGroqApiKey = () => {
   try {
+    // Vite context (preferred for Vercel/Vite deployments)
     // @ts-ignore
-    return process.env.GROQ_API_KEY || '';
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      const val = import.meta.env.VITE_GROQ_API_KEY;
+      if (val) return val;
+    }
+  } catch (e) { /* ignore */ }
+
+  try {
+    // Process context (Node/Legacy)
+    // @ts-ignore
+    return process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY || '';
   } catch (e) {
     return '';
   }
@@ -136,7 +147,7 @@ const createMonthClosingPrompt = (plannedExpenses: Expense[], realized: Transact
 
 const callGroq = async (prompt: string, jsonMode = false): Promise<string> => {
   const apiKey = getGroqApiKey();
-  if (!apiKey) throw new Error("Chave Groq não configurada.");
+  if (!apiKey) throw new Error("Chave VITE_GROQ_API_KEY não configurada no ambiente.");
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -182,7 +193,7 @@ const callGemini = async (prompt: string, jsonMode = false): Promise<string> => 
 
 export const analyzeWithAI = async (
   type: AIAnalysisType,
-  provider: AIProvider,
+  provider: AIProvider = 'groq',
   data: { incomes?: Income[], expenses?: Expense[], investments?: Investment[], transactions?: Transaction[], paysRent?: boolean }
 ): Promise<string> => {
   
@@ -199,11 +210,11 @@ export const analyzeWithAI = async (
     prompt = createMonthClosingPrompt(data.expenses, data.transactions, data.incomes);
   }
 
-  if (provider === 'groq' && getGroqApiKey()) {
+  if (provider === 'groq') {
     try {
       return await callGroq(prompt);
     } catch (e) {
-      console.warn("Groq falhou (provavelmente CORS), tentando Gemini como fallback...", e);
+      console.warn("Groq falhou, tentando Gemini como fallback...", e);
       return await callGemini(prompt);
     }
   }
@@ -214,12 +225,12 @@ export const analyzeWithAI = async (
 export const suggestBasicBudget = async (
   totalIncome: number,
   paysRent: boolean,
-  provider: AIProvider = 'gemini',
+  provider: AIProvider = 'groq',
   mandatoryExpenses?: string
 ): Promise<string> => {
   const prompt = createStandardBudgetPrompt(totalIncome, paysRent, mandatoryExpenses);
   
-  if (provider === 'groq' && getGroqApiKey()) {
+  if (provider === 'groq') {
     try {
       return await callGroq(prompt);
     } catch (e) {
@@ -232,7 +243,7 @@ export const suggestBasicBudget = async (
 export const suggestCategories = async (
   descriptions: string[], 
   categories: string[],
-  provider: AIProvider = 'gemini'
+  provider: AIProvider = 'groq'
 ): Promise<Record<string, string>> => {
   if (descriptions.length === 0) return {};
   
@@ -241,7 +252,7 @@ export const suggestCategories = async (
   
   try {
     let result = '';
-    if (provider === 'groq' && getGroqApiKey()) {
+    if (provider === 'groq') {
       try {
         result = await callGroq(prompt, true);
       } catch (e) {
@@ -265,13 +276,13 @@ export const suggestCategories = async (
 
 export const parseBankStatement = async (
   text: string,
-  provider: AIProvider = 'gemini'
+  provider: AIProvider = 'groq'
 ): Promise<any[]> => {
   const prompt = `Extraia transações do extrato bancário. Retorne array JSON de objetos: { "description", "amount", "date" (YYYY-MM-DD), "transactionType" ('INCOME'|'EXPENSE') }. Texto: ${text}`;
 
   try {
     let result = '';
-    if (provider === 'groq' && getGroqApiKey()) {
+    if (provider === 'groq') {
       try {
         result = await callGroq(prompt, true);
       } catch (e) {
@@ -295,13 +306,13 @@ export const parseBankStatement = async (
 
 export const suggestShoppingCategories = async (
   itemNames: string[],
-  provider: AIProvider = 'gemini'
+  provider: AIProvider = 'groq'
 ): Promise<Record<string, { category: string, price: number }>> => {
   const prompt = `Para cada item, sugira categoria com emoji e preço médio em BRL. Retorne JSON: { "item": { "category", "price" } }. Itens: ${JSON.stringify(itemNames)}`;
 
   try {
     let result = '';
-    if (provider === 'groq' && getGroqApiKey()) {
+    if (provider === 'groq') {
       try {
         result = await callGroq(prompt, true);
       } catch (e) {
