@@ -12,14 +12,24 @@
         theme: {
           extend: {
             colors: {
+              // Redefinindo Slate para tons de Cinza Neutro (Estilo Google Dark Mode)
               slate: {
-                750: '#2d3748',
-                850: '#1a202c',
-                900: '#0f172a',
-                950: '#020617',
+                50: '#f9f9f9',
+                100: '#f1f1f1',
+                200: '#e5e5e5',
+                300: '#d4d4d4',
+                400: '#a3a3a3',
+                500: '#737373',
+                600: '#525252',
+                700: '#404040',
+                750: '#333333', // Custom intermediate
+                800: '#2d2e31', // Elevation 2
+                850: '#242424', // Elevation 1.5
+                900: '#1e1e1e', // Elevation 1 (Cards/Inputs)
+                950: '#121212', // Background (Base)
               },
               brand: {
-                500: '#10b981', // Emerald equivalent
+                500: '#10b981', 
                 600: '#059669',
               }
             }
@@ -30,7 +40,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
       :root {
-        font-size: 14px; /* Fixes the "huge font" issue by scaling down 1rem from 16px to 14px */
+        font-size: 14px;
       }
 
       html {
@@ -54,19 +64,19 @@
         background: transparent;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb {
-        background-color: #cbd5e1; /* slate-300 */
+        background-color: #e5e5e5; /* neutral-200 */
         border-radius: 4px;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background-color: #94a3b8; /* slate-400 */
+        background-color: #d4d4d4; /* neutral-300 */
       }
 
       /* Dark theme scrollbar */
       .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-        background-color: #475569; /* slate-600 */
+        background-color: #404040; /* neutral-700 */
       }
       .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background-color: #64748b; /* slate-500 */
+        background-color: #525252; /* neutral-600 */
       }
     </style>
   <script type="importmap">

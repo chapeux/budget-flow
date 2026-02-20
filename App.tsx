@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { PlusCircle, Wallet, TrendingDown, PieChart, Loader2, FileDown, Eye, EyeOff, LogOut, Moon, Sun, LayoutDashboard, ListOrdered, CreditCard as CardIcon, ShoppingCart, Target, Wrench, FlaskConical, RotateCcw } from 'lucide-react';
 import { IncomeManager } from './components/IncomeManager';
@@ -13,6 +14,7 @@ import { TransactionsPage } from './components/TransactionsPage';
 import { MonthClosing } from './components/MonthClosing';
 import { ToolsPage } from './components/ToolsPage';
 import { Auth } from './components/Auth';
+import { LandingPage } from './components/LandingPage';
 import { Income, Expense, Investment, ScheduledEvent, Transaction, CreditCard, ShoppingItem, ShoppingHistoryEntry } from './types';
 import { supabase } from './lib/supabase';
 import { generateBudgetPDF } from './services/pdfGenerator';
@@ -43,6 +45,7 @@ const generateUUID = () => {
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
+  const [showAuth, setShowAuth] = useState(false);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]); 
   const [transactions, setTransactions] = useState<Transaction[]>([]); 
@@ -56,7 +59,11 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
   const [currentView, setCurrentView] = useState<'dashboard' | 'transactions' | 'cards' | 'shopping' | 'closing' | 'tools'>('dashboard');
+  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
   
+  // Simulated Plan State (PRO logic)
+  const [userPlan, setUserPlan] = useState<'FREE' | 'PRO'>('FREE');
+
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [snapshot, setSnapshot] = useState<any>(null);
 
@@ -82,12 +89,19 @@ export default function App() {
       setSession(session);
       setIsLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveringPassword(true);
+      }
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
   const fetchData = async (silent = false) => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || isRecoveringPassword) return;
     try {
       if (!silent) setIsLoading(true);
       const [catRes, incRes, expRes, transRes, invRes, eventRes, cardRes, shopRes] = await Promise.all([
@@ -113,7 +127,7 @@ export default function App() {
         transactionType: t.transaction_type || 'EXPENSE', 
         status: t.status || 'DONE', 
         date: t.date, 
-        referenceDate: t.reference_date,
+        reference_date: t.reference_date,
         cardId: t.card_id
       })));
       if (invRes.data) setInvestments(invRes.data.map((i: any) => ({ id: i.id, name: i.name, amount: i.amount, annualRate: i.annual_rate, category: i.category })));
@@ -121,12 +135,12 @@ export default function App() {
       if (cardRes.data) setCards(cardRes.data.map((c: any) => ({ 
         id: c.id, 
         name: c.name, 
-        limitAmount: c.limit_amount || 0,
-        closingDay: c.closing_day || 1,
-        dueDay: c.due_day || 1,
+        limit_amount: c.limit_amount || 0,
+        closing_day: c.closing_day || 1,
+        due_day: c.due_day || 1,
         color: c.color 
       })));
-      if (shopRes.data) setShoppingItems(shopRes.data.map((s: any) => ({ id: s.id, name: s.name, quantity: s.quantity, isChecked: s.is_checked, category: s.category, price: s.price })));
+      if (shopRes.data) setShoppingItems(shopRes.data.map((s: any) => ({ id: s.id, name: s.name, quantity: s.quantity, is_checked: s.is_checked, category: s.category, price: s.price })));
 
       try {
           const { data: historyData } = await supabase.from('product_history').select('product_name, last_price').eq('user_id', session.user.id);
@@ -139,7 +153,7 @@ export default function App() {
 
       try {
           const { data: shData } = await supabase.from('shopping_history').select('*').eq('user_id', session.user.id).order('date', { ascending: false });
-          if (shData) setShoppingHistory(shData.map((h: any) => ({ id: h.id, date: h.date, totalAmount: h.total_amount, items: h.items })));
+          if (shData) setShoppingHistory(shData.map((h: any) => ({ id: h.id, date: h.date, total_amount: h.total_amount, items: h.items })));
       } catch (err) {}
 
     } catch (error) {
@@ -150,8 +164,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (session?.user?.id) fetchData();
-  }, [session?.user?.id]);
+    if (session?.user?.id && !isRecoveringPassword) fetchData();
+  }, [session?.user?.id, isRecoveringPassword]);
 
   const toggleSimulation = () => {
     if (!isSimulationMode) {
@@ -183,6 +197,7 @@ export default function App() {
   const balance = totalIncome - totalBudgetExpenses;
   const freeCash = balance - totalInvestments;
 
+  // Fix reference error: changed isPrivacyEnabled to isPrivacyMode
   const displayValue = (value: number) => isPrivacyMode ? '••••••' : `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
   const handleLogout = async () => {
@@ -278,7 +293,7 @@ export default function App() {
   const updateShoppingItem = async (item: ShoppingItem) => {
     if (isSimulationMode) { setShoppingItems(prev => prev.map(i => i.id === item.id ? item : i)); return; }
     const { error } = await supabase.from('shopping_items').update({ name: item.name, quantity: item.quantity, is_checked: item.isChecked, category: item.category, price: item.price }).eq('id', item.id);
-    if (!error) setShoppingItems(prev => prev.map(i => i.id === item.id ? item : i));
+    if (!error) setShoppingItems(prev => [...prev, item]);
   };
 
   const removeShoppingItem = async (id: string) => {
@@ -323,7 +338,7 @@ export default function App() {
     if (isSimulationMode) { setInvestments(prev => [...prev, investment]); return; }
     if (!session?.user?.id) return;
     const { error } = await supabase.from('investments').insert([{ name: investment.name, amount: investment.amount, annual_rate: investment.annualRate, category: investment.category, user_id: session.user.id }]);
-    if (!error) setInvestments([...investments, investment]);
+    if (!error) setInvestments(prev => [...prev, investment]);
   };
 
   const updateInvestment = async (updatedInv: Investment) => {
@@ -365,7 +380,34 @@ export default function App() {
     if (!error) setCustomCategories(prev => [...prev, category]);
   };
 
-  if (!session && !isLoading) return <Auth />;
+  // Logic: Session is primary. If no session, show Landing OR Auth.
+  if (!session && !isLoading) {
+    if (showAuth || isRecoveringPassword) {
+      return (
+        <Auth 
+          onFinishedRecovery={() => {
+            setIsRecoveringPassword(false);
+            fetchData();
+          }} 
+          onBack={() => setShowAuth(false)}
+        />
+      );
+    }
+    return <LandingPage 
+             theme={theme} 
+             toggleTheme={toggleTheme} 
+             onGetStarted={() => setShowAuth(true)} 
+             onLogin={() => setShowAuth(true)} 
+           />;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-950">
+        <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen pb-20 transition-colors duration-300 ${isSimulationMode ? 'bg-amber-50/30 dark:bg-amber-950/10' : 'bg-slate-50 dark:bg-slate-950'}`}>
@@ -442,7 +484,7 @@ export default function App() {
                 <div className={`p-5 rounded-xl shadow-sm border ${isSimulationMode ? 'bg-amber-100/30 border-amber-300' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'}`}><h3 className="text-sm font-medium text-slate-500 mb-2 flex items-center gap-1.5">Investimentos Fixos {isSimulationMode && <FlaskConical className="w-3 h-3 text-amber-500" />}</h3><p className="text-xl font-bold text-blue-600">{displayValue(totalInvestments)}</p></div>
                 <div className={`p-5 rounded-xl shadow-sm border ${freeCash < 0 ? 'bg-rose-50 border-rose-200' : (isSimulationMode ? 'bg-amber-100/30 border-amber-300' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800')}`}><h3 className="text-sm font-medium text-slate-500 mb-2 flex items-center gap-1.5">Saldo Livre {isSimulationMode && <FlaskConical className="w-3 h-3 text-amber-500" />}</h3><p className={`text-xl font-bold ${freeCash < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{displayValue(freeCash)}</p></div>
               </div>
-              <div className="mb-8"><AIAnalysis incomes={incomes} expenses={expenses} investments={investments} balance={balance} isPrivacyEnabled={isPrivacyMode} onAddExpense={addExpense} onAddInvestment={addInvestment} /></div>
+              <div className="mb-8"><AIAnalysis incomes={incomes} expenses={expenses} investments={investments} balance={balance} isPrivacyEnabled={isPrivacyMode} onAddExpense={addExpense} onAddInvestment={addInvestment} userPlan={userPlan} /></div>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-7 space-y-8">
                   <IncomeManager incomes={incomes} onAdd={addIncome} onUpdate={updateIncome} onRemove={removeIncome} isPrivacyEnabled={isPrivacyMode} />

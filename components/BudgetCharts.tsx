@@ -71,7 +71,7 @@ export const BudgetCharts: React.FC<BudgetChartsProps> = ({ incomes, expenses, i
                 outerRadius={80}
                 paddingAngle={5}
                 dataKey="value"
-                stroke={isDarkMode ? '#0f172a' : '#fff'}
+                stroke={isDarkMode ? '#1e1e1e' : '#fff'}
               >
                 {categoryData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -80,14 +80,14 @@ export const BudgetCharts: React.FC<BudgetChartsProps> = ({ incomes, expenses, i
               <Tooltip 
                 formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                 contentStyle={{ 
-                    borderRadius: '8px', 
-                    border: isDarkMode ? '1px solid #334155' : 'none', 
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                    backgroundColor: isDarkMode ? '#1e293b' : '#fff',
-                    color: isDarkMode ? '#f1f5f9' : '#1e293b'
+                    borderRadius: '12px', 
+                    border: isDarkMode ? '1px solid #404040' : 'none', 
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.2)',
+                    backgroundColor: isDarkMode ? '#2d2e31' : '#fff',
+                    color: isDarkMode ? '#f5f5f5' : '#1e1e1e'
                 }}
               />
-              <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: isDarkMode ? '#cbd5e1' : '#475569' }} />
+              <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: isDarkMode ? '#a3a3a3' : '#404040' }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -100,24 +100,24 @@ export const BudgetCharts: React.FC<BudgetChartsProps> = ({ incomes, expenses, i
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={typeData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#334155' : '#f1f5f9'} />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: isDarkMode ? '#94a3b8' : '#64748b' }} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#2d2e31' : '#f1f1f1'} />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: isDarkMode ? '#a3a3a3' : '#737373' }} />
               <YAxis 
                 axisLine={false} 
                 tickLine={false} 
                 tickFormatter={(value) => `R$${value}`} 
                 fontSize={12}
-                tick={{ fill: isDarkMode ? '#94a3b8' : '#64748b' }}
+                tick={{ fill: isDarkMode ? '#a3a3a3' : '#737373' }}
               />
               <Tooltip 
                  formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                 cursor={{ fill: isDarkMode ? '#1e293b' : '#f8fafc' }}
+                 cursor={{ fill: isDarkMode ? '#242424' : '#f9f9f9' }}
                  contentStyle={{ 
-                    borderRadius: '8px', 
-                    border: isDarkMode ? '1px solid #334155' : 'none', 
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                    backgroundColor: isDarkMode ? '#1e293b' : '#fff',
-                    color: isDarkMode ? '#f1f5f9' : '#1e293b'
+                    borderRadius: '12px', 
+                    border: isDarkMode ? '1px solid #404040' : 'none', 
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.2)',
+                    backgroundColor: isDarkMode ? '#2d2e31' : '#fff',
+                    color: isDarkMode ? '#f5f5f5' : '#1e1e1e'
                 }}
               />
               <Bar dataKey="amount" fill="#6366f1" radius={[6, 6, 0, 0]} barSize={50}>
