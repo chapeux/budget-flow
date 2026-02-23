@@ -16,6 +16,7 @@ interface AIAnalysisProps {
   onAddExpense?: (expense: Expense) => void;
   onAddInvestment?: (investment: Investment) => void;
   userPlan?: 'FREE' | 'PRO';
+  onUpgrade?: () => void;
 }
 
 export const AIAnalysis: React.FC<AIAnalysisProps> = ({ 
@@ -26,7 +27,8 @@ export const AIAnalysis: React.FC<AIAnalysisProps> = ({
   isPrivacyEnabled, 
   onAddExpense,
   onAddInvestment,
-  userPlan = 'FREE'
+  userPlan = 'FREE',
+  onUpgrade
 }) => {
   const [provider, setProvider] = useState<AIProvider>('groq');
   const [activeTab, setActiveTab] = useState<'BUDGET' | 'INVESTMENT' | 'GENERATE'>('BUDGET');
@@ -37,11 +39,21 @@ export const AIAnalysis: React.FC<AIAnalysisProps> = ({
   const [parsedSuggestions, setParsedSuggestions] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [paysRent, setPaysRent] = useState(true);
   const [mandatoryExpenses, setMandatoryExpenses] = useState('');
 
   const isPro = userPlan === 'PRO';
+
+  const handleUpgradeClick = () => {
+      setIsUpgrading(true);
+      // Simulate payment processing time
+      setTimeout(() => {
+          if (onUpgrade) onUpgrade();
+          setIsUpgrading(false);
+      }, 1500);
+  };
 
   const handleAnalyze = async () => {
     if (!isPro) return;
@@ -135,7 +147,7 @@ export const AIAnalysis: React.FC<AIAnalysisProps> = ({
   };
 
   const ProLock = () => (
-    <div className="absolute inset-0 bg-white/60 dark:bg-slate-950/60 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center text-center p-6 rounded-xl">
+    <div className="absolute inset-0 bg-white/60 dark:bg-slate-950/60 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center text-center p-6 rounded-xl animate-in fade-in duration-500">
         <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-500/20 mb-6 scale-110">
             <Lock className="w-8 h-8" />
         </div>
@@ -143,7 +155,11 @@ export const AIAnalysis: React.FC<AIAnalysisProps> = ({
         <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xs mb-8 font-medium">
             Assine o plano Pro para desbloquear análises inteligentes, sugestões de investimento e estruturação de orçamento via IA.
         </p>
-        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-4 rounded-xl shadow-lg">
+        <Button 
+            onClick={handleUpgradeClick} 
+            isLoading={isUpgrading}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-4 rounded-xl shadow-lg transform transition-all active:scale-95"
+        >
             Fazer Upgrade <Zap className="ml-2 w-4 h-4 fill-current" />
         </Button>
         <p className="text-[10px] text-slate-400 mt-4 uppercase font-bold tracking-widest">Apenas R$ 19,90/mês</p>
