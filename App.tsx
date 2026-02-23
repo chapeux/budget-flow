@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { PlusCircle, Wallet, TrendingDown, PieChart, Loader2, FileDown, Eye, EyeOff, LogOut, Moon, Sun, LayoutDashboard, ListOrdered, CreditCard as CardIcon, ShoppingCart, Target, Wrench, FlaskConical, RotateCcw } from 'lucide-react';
+import { PlusCircle, Wallet, TrendingDown, PieChart, Loader2, FileDown, Eye, EyeOff, LogOut, Moon, Sun, LayoutDashboard, ListOrdered, CreditCard as CardIcon, ShoppingCart, Target, Wrench, FlaskConical, RotateCcw, CheckCircle2 } from 'lucide-react';
 import { IncomeManager } from './components/IncomeManager';
 import { ExpenseManager } from './components/ExpenseManager';
 import { InvestmentManager } from './components/InvestmentManager';
@@ -61,7 +61,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<'dashboard' | 'transactions' | 'cards' | 'shopping' | 'closing' | 'tools'>('dashboard');
   const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
   
-  // Simulated Plan State (PRO logic)
+  // Real Plan State from Database
   const [userPlan, setUserPlan] = useState<'FREE' | 'PRO'>('FREE');
 
   const [isSimulationMode, setIsSimulationMode] = useState(false);
@@ -87,11 +87,13 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session) fetchUserProfile(session.user.id);
       setIsLoading(false);
     });
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (session) fetchUserProfile(session.user.id);
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecoveringPassword(true);
       }
@@ -99,6 +101,25 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('plan')
+        .eq('id', userId)
+        .single();
+      
+      if (data) {
+        setUserPlan(data.plan as 'FREE' | 'PRO');
+      } else if (error && error.code === 'PGRST116') {
+        // Profile not found, create one
+        await supabase.from('profiles').insert([{ id: userId, plan: 'FREE' }]);
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+    }
+  };
 
   const fetchData = async (silent = false) => {
     if (!session?.user?.id || isRecoveringPassword) return;
@@ -190,6 +211,22 @@ export default function App() {
       }
   };
 
+  const handleUpgrade = async () => {
+    if (!session?.user?.id) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ plan: 'PRO' })
+      .eq('id', session.user.id);
+    
+    if (!error) {
+      setUserPlan('PRO');
+      alert("Parabéns! Seu plano foi atualizado para PRO com sucesso.");
+    } else {
+      console.error("Erro ao fazer upgrade:", error);
+      alert("Houve um problema ao processar seu upgrade. Tente novamente.");
+    }
+  };
+
   const allCategories = useMemo(() => Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories])), [customCategories]);
   const totalIncome = useMemo(() => incomes.reduce((acc, curr) => acc + curr.amount, 0), [incomes]);
   const totalBudgetExpenses = useMemo(() => expenses.reduce((acc, curr) => acc + curr.amount, 0), [expenses]);
@@ -197,11 +234,11 @@ export default function App() {
   const balance = totalIncome - totalBudgetExpenses;
   const freeCash = balance - totalInvestments;
 
-  // Fix reference error: changed isPrivacyEnabled to isPrivacyMode
   const displayValue = (value: number) => isPrivacyMode ? '••••••' : `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
   const handleLogout = async () => {
     setIncomes([]); setExpenses([]); setTransactions([]); setInvestments([]); setScheduledEvents([]); setCards([]); setShoppingItems([]); setShoppingHistory([]); setCustomCategories([]); setPriceHistory({});
+    setUserPlan('FREE');
     await supabase.auth.signOut();
   };
 
@@ -293,7 +330,7 @@ export default function App() {
   const updateShoppingItem = async (item: ShoppingItem) => {
     if (isSimulationMode) { setShoppingItems(prev => prev.map(i => i.id === item.id ? item : i)); return; }
     const { error } = await supabase.from('shopping_items').update({ name: item.name, quantity: item.quantity, is_checked: item.isChecked, category: item.category, price: item.price }).eq('id', item.id);
-    if (!error) setShoppingItems(prev => [...prev, item]);
+    if (!error) setShoppingItems(prev => prev.map(i => i.id === item.id ? item : i));
   };
 
   const removeShoppingItem = async (id: string) => {
@@ -484,7 +521,7 @@ export default function App() {
                 <div className={`p-5 rounded-xl shadow-sm border ${isSimulationMode ? 'bg-amber-100/30 border-amber-300' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'}`}><h3 className="text-sm font-medium text-slate-500 mb-2 flex items-center gap-1.5">Investimentos Fixos {isSimulationMode && <FlaskConical className="w-3 h-3 text-amber-500" />}</h3><p className="text-xl font-bold text-blue-600">{displayValue(totalInvestments)}</p></div>
                 <div className={`p-5 rounded-xl shadow-sm border ${freeCash < 0 ? 'bg-rose-50 border-rose-200' : (isSimulationMode ? 'bg-amber-100/30 border-amber-300' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800')}`}><h3 className="text-sm font-medium text-slate-500 mb-2 flex items-center gap-1.5">Saldo Livre {isSimulationMode && <FlaskConical className="w-3 h-3 text-amber-500" />}</h3><p className={`text-xl font-bold ${freeCash < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{displayValue(freeCash)}</p></div>
               </div>
-              <div className="mb-8"><AIAnalysis incomes={incomes} expenses={expenses} investments={investments} balance={balance} isPrivacyEnabled={isPrivacyMode} onAddExpense={addExpense} onAddInvestment={addInvestment} userPlan={userPlan} /></div>
+              <div className="mb-8"><AIAnalysis incomes={incomes} expenses={expenses} investments={investments} balance={balance} isPrivacyEnabled={isPrivacyMode} onAddExpense={addExpense} onAddInvestment={addInvestment} userPlan={userPlan} onUpgrade={handleUpgrade} /></div>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-7 space-y-8">
                   <IncomeManager incomes={incomes} onAdd={addIncome} onUpdate={updateIncome} onRemove={removeIncome} isPrivacyEnabled={isPrivacyMode} />
